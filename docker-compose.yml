@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hvac_ops}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  web:
+    build:
+      context: .
+    command: sh -c "python docker/wait_for_db.py && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    environment:
+      PYTHONPATH: /app
+      DJANGO_SETTINGS_MODULE: config.settings
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-insecure-local-development-key-change-me}
+      DEBUG: ${DEBUG:-True}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-hvac_ops}
+      DATABASE_CONNECT_TIMEOUT: ${DATABASE_CONNECT_TIMEOUT:-5}
+      TIME_ZONE: ${TIME_ZONE:-America/Los_Angeles}
+      GOOGLE_CALENDAR_CREDENTIALS_JSON: ${GOOGLE_CALENDAR_CREDENTIALS_JSON:-}
+      GOOGLE_CALENDAR_ID: ${GOOGLE_CALENDAR_ID:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}
+      SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-False}
+    ports:
+      - "${WEB_PORT:-8000}:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

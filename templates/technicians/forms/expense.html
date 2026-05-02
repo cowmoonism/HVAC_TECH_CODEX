@@ -1,0 +1,37 @@
+{% extends "technicians/forms/base.html" %}
+{% block form %}
+<form>
+  <input type="hidden" name="telegram_user_id" value="{{ telegram_user_id }}">
+  <input type="hidden" name="telegram_group_chat_id" value="{{ telegram_group_chat_id }}">
+  <div class="grid two">
+    <div>
+      <label for="expense_date">Expense Date</label>
+      <input id="expense_date" name="expense_date" type="date" required>
+    </div>
+    <div>
+      <label for="google_event_id">Google Event ID</label>
+      <input id="google_event_id" name="google_event_id" type="text">
+    </div>
+    <div>
+      <label for="expense_type">Expense Type</label>
+      <select id="expense_type" name="expense_type" required>
+        {% for value, label in expense_types %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="amount">Amount</label>
+      <input id="amount" name="amount" type="number" min="0" step="0.01" required>
+    </div>
+    <div class="full">
+      <label for="description">Description</label>
+      <textarea id="description" name="description"></textarea>
+    </div>
+    <div class="full">
+      <label for="receipt_photo_url">Receipt Photo URL</label>
+      <input id="receipt_photo_url" name="receipt_photo_url" type="url">
+    </div>
+  </div>
+  <button type="submit">Submit Expense</button>
+  <div id="result" class="result"></div>
+</form>
+{% endblock %}

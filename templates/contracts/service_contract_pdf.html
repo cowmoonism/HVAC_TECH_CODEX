@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Service Contract {{ contract.contract_number }}</title>
+  <style>
+    @page { size: letter; margin: 0.55in; }
+    body {
+      margin: 0;
+      color: #182230;
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    h1, h2, p { margin: 0; }
+    .header {
+      border-bottom: 2px solid #0f766e;
+      padding-bottom: 14px;
+      margin-bottom: 20px;
+    }
+    .company {
+      font-size: 22px;
+      font-weight: 700;
+      color: #0f766e;
+    }
+    .muted { color: #667085; }
+    .meta {
+      display: table;
+      width: 100%;
+      margin-top: 12px;
+    }
+    .meta > div {
+      display: table-cell;
+      width: 50%;
+      vertical-align: top;
+    }
+    .section {
+      margin: 18px 0;
+      padding-top: 10px;
+      border-top: 1px solid #d0d5dd;
+    }
+    .section h2 {
+      margin-bottom: 8px;
+      font-size: 14px;
+      color: #0f172a;
+    }
+    .row {
+      display: table;
+      width: 100%;
+      margin: 4px 0;
+    }
+    .label, .value {
+      display: table-cell;
+      vertical-align: top;
+    }
+    .label {
+      width: 34%;
+      color: #475467;
+      font-weight: 700;
+    }
+    .amounts {
+      width: 45%;
+      margin-left: auto;
+      border-collapse: collapse;
+    }
+    .amounts td {
+      padding: 6px 0;
+      border-bottom: 1px solid #eaecf0;
+    }
+    .amounts td:last-child {
+      text-align: right;
+      font-weight: 700;
+    }
+    .total td {
+      color: #0f766e;
+      font-size: 15px;
+      border-bottom: 0;
+    }
+    .signature {
+      margin-top: 42px;
+      display: table;
+      width: 100%;
+    }
+    .signature > div {
+      display: table-cell;
+      width: 50%;
+      padding-right: 24px;
+    }
+    .line {
+      border-bottom: 1px solid #182230;
+      height: 30px;
+      margin-bottom: 6px;
+    }
+    .terms {
+      font-size: 11px;
+      color: #475467;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <p class="company">HVAC Operations Platform</p>
+    <p class="muted">Service receipt and contract placeholder header</p>
+    <div class="meta">
+      <div>
+        <p><strong>Contract Number:</strong> {{ contract.contract_number }}</p>
+        <p><strong>Date:</strong> {{ contract.contract_date }}</p>
+      </div>
+      <div>
+        <p><strong>Status:</strong> {{ contract.get_status_display }}</p>
+        <p><strong>Technician:</strong> {{ contract.technician }}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Customer</h2>
+    <div class="row"><div class="label">Name</div><div class="value">{{ contract.customer_name }}</div></div>
+    <div class="row"><div class="label">Address</div><div class="value">{{ contract.customer_address|linebreaksbr }}</div></div>
+    <div class="row"><div class="label">Phone</div><div class="value">{{ contract.customer_phone }}</div></div>
+    <div class="row"><div class="label">State ID</div><div class="value">{{ contract.state_id|default:"N/A" }}</div></div>
+  </div>
+
+  <div class="section">
+    <h2>Project</h2>
+    <div class="row"><div class="label">Project Type</div><div class="value">{{ contract.get_project_type_display }}</div></div>
+    <div class="row"><div class="label">Description</div><div class="value">{{ contract.project_description|default:"N/A"|linebreaksbr }}</div></div>
+  </div>
+
+  <div class="section">
+    <h2>Totals</h2>
+    <table class="amounts">
+      <tr><td>Subtotal</td><td>${{ contract.subtotal }}</td></tr>
+      <tr><td>Sales Tax</td><td>${{ contract.sales_tax }}</td></tr>
+      <tr class="total"><td>Total</td><td>${{ contract.total }}</td></tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Payment</h2>
+    <div class="row"><div class="label">Credit Card Last 4</div><div class="value">{{ contract.credit_card_last4|default:"N/A" }}</div></div>
+    <div class="row"><div class="label">Card Expiration</div><div class="value">{{ contract.card_exp_date|default:"N/A" }}</div></div>
+    <div class="row"><div class="label">Billing ZIP</div><div class="value">{{ contract.billing_zip_code|default:"N/A" }}</div></div>
+  </div>
+
+  <div class="signature">
+    <div>
+      <div class="line"></div>
+      <p>Customer Signature</p>
+    </div>
+    <div>
+      <div class="line"></div>
+      <p>Technician Signature</p>
+    </div>
+  </div>
+
+  <div class="section terms">
+    <h2>Terms</h2>
+    <p>Simple terms placeholder: customer authorizes the listed work and agrees to the stated total. Final production terms, warranty language, cancellation policy, and signature language will be finalized before launch.</p>
+  </div>
+</body>
+</html>

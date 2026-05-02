@@ -1,0 +1,73 @@
+{% extends "technicians/forms/base.html" %}
+{% block form %}
+<form>
+  <input type="hidden" name="telegram_user_id" value="{{ telegram_user_id }}">
+  <input type="hidden" name="telegram_group_chat_id" value="{{ telegram_group_chat_id }}">
+  <div class="grid two">
+    <div>
+      <label for="report_date">Report Date</label>
+      <input id="report_date" name="report_date" type="date" required>
+    </div>
+    <div>
+      <label for="google_event_id">Google Event ID</label>
+      <input id="google_event_id" name="google_event_id" type="text">
+    </div>
+    <div>
+      <label for="job_number">Job Number</label>
+      <input id="job_number" name="job_number" type="text">
+    </div>
+    <div>
+      <label for="building_number">Building Number</label>
+      <input id="building_number" name="building_number" type="text">
+    </div>
+    <div class="full">
+      <label for="address">Address</label>
+      <textarea id="address" name="address"></textarea>
+    </div>
+    <div>
+      <label for="payment_type">Payment Type</label>
+      <select id="payment_type" name="payment_type" required>
+        {% for value, label in payment_types %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="amount">Amount</label>
+      <input id="amount" name="amount" type="number" min="0" step="0.01" required>
+    </div>
+    <div>
+      <label for="closed_by">Closed By</label>
+      <select id="closed_by" name="closed_by" required>
+        {% for value, label in closed_by_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="groupon_review">Groupon Review</label>
+      <select id="groupon_review" name="groupon_review" required>
+        {% for value, label in review_statuses %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="google_review">Google Review</label>
+      <select id="google_review" name="google_review" required>
+        {% for value, label in review_statuses %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="yearly_maintenance_plan">Yearly Maintenance Plan</label>
+      <select id="yearly_maintenance_plan" name="yearly_maintenance_plan" required>
+        {% for value, label in review_statuses %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="full">
+      <label for="project_description">Project Description</label>
+      <textarea id="project_description" name="project_description"></textarea>
+    </div>
+    <div class="full">
+      <label for="comments">Comments</label>
+      <textarea id="comments" name="comments"></textarea>
+    </div>
+  </div>
+  <button type="submit">Submit Report</button>
+  <div id="result" class="result"></div>
+</form>
+{% endblock %}

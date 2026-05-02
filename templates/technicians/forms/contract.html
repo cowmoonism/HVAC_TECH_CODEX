@@ -1,0 +1,65 @@
+{% extends "technicians/forms/base.html" %}
+{% block form %}
+<form>
+  <input type="hidden" name="telegram_user_id" value="{{ telegram_user_id }}">
+  <input type="hidden" name="telegram_group_chat_id" value="{{ telegram_group_chat_id }}">
+  <div class="grid two">
+    <div>
+      <label for="contract_date">Contract Date</label>
+      <input id="contract_date" name="contract_date" type="date" required>
+    </div>
+    <div>
+      <label for="google_event_id">Google Event ID</label>
+      <input id="google_event_id" name="google_event_id" type="text">
+    </div>
+    <div class="full">
+      <label for="customer_name">Customer Name</label>
+      <input id="customer_name" name="customer_name" type="text" required>
+    </div>
+    <div class="full">
+      <label for="customer_address">Customer Address</label>
+      <textarea id="customer_address" name="customer_address" required></textarea>
+    </div>
+    <div>
+      <label for="customer_phone">Customer Phone</label>
+      <input id="customer_phone" name="customer_phone" type="tel" required>
+    </div>
+    <div>
+      <label for="state_id">State ID</label>
+      <input id="state_id" name="state_id" type="text">
+    </div>
+    <div>
+      <label for="project_type">Project Type</label>
+      <select id="project_type" name="project_type" required>
+        {% for value, label in project_types %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="subtotal">Subtotal</label>
+      <input id="subtotal" name="subtotal" type="number" min="0" step="0.01" required>
+    </div>
+    <div>
+      <label for="sales_tax">Sales Tax</label>
+      <input id="sales_tax" name="sales_tax" type="number" min="0" step="0.01" required>
+    </div>
+    <div>
+      <label for="credit_card_last4">Credit Card Last 4</label>
+      <input id="credit_card_last4" name="credit_card_last4" type="text" maxlength="4" inputmode="numeric">
+    </div>
+    <div>
+      <label for="card_exp_date">Card Exp Date</label>
+      <input id="card_exp_date" name="card_exp_date" type="text" placeholder="MM/YY">
+    </div>
+    <div>
+      <label for="billing_zip_code">Billing ZIP Code</label>
+      <input id="billing_zip_code" name="billing_zip_code" type="text">
+    </div>
+    <div class="full">
+      <label for="project_description">Project Description</label>
+      <textarea id="project_description" name="project_description"></textarea>
+    </div>
+  </div>
+  <button type="submit">Submit Contract</button>
+  <div id="result" class="result"></div>
+</form>
+{% endblock %}

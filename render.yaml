@@ -1,0 +1,51 @@
+databases:
+  - name: hvac-ops-db
+    databaseName: hvac_ops
+    user: hvac_ops
+    plan: starter
+
+services:
+  - type: web
+    name: hvac-ops-backend
+    runtime: python
+    plan: starter
+    rootDir: .
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        sync: false
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: hvac-ops-backend.onrender.com
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://hvac-ops-backend.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://hvac-ops-frontend.onrender.com
+      - key: DATABASE_URL
+        fromDatabase:
+          name: hvac-ops-db
+          property: connectionString
+      - key: DATABASE_CONNECT_TIMEOUT
+        value: "5"
+      - key: SECURE_SSL_REDIRECT
+        value: "True"
+      - key: TIME_ZONE
+        value: America/Los_Angeles
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TECHNICIAN_BOT_TOKEN
+        sync: false
+      - key: TECHNICIAN_API_SHARED_SECRET
+        sync: false
+      - key: PUBLIC_BASE_URL
+        value: https://hvac-ops-backend.onrender.com
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON_PATH
+        value: /etc/secrets/google-service-account.json
+      - key: GOOGLE_CALENDAR_SCOPES
+        value: https://www.googleapis.com/auth/calendar
+    disks:
+      - name: hvac-ops-media
+        mountPath: /opt/render/project/src/media
+        sizeGB: 1
