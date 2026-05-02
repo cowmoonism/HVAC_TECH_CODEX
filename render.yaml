@@ -31,6 +31,16 @@ services:
         value: "5"
       - key: SECURE_SSL_REDIRECT
         value: "True"
+      - key: SESSION_COOKIE_SECURE
+        value: "True"
+      - key: CSRF_COOKIE_SECURE
+        value: "True"
+      - key: SECURE_HSTS_SECONDS
+        value: "31536000"
+      - key: SECURE_HSTS_INCLUDE_SUBDOMAINS
+        value: "True"
+      - key: SECURE_HSTS_PRELOAD
+        value: "True"
       - key: TIME_ZONE
         value: America/Los_Angeles
       - key: TELEGRAM_BOT_TOKEN
@@ -45,7 +55,7 @@ services:
         value: /etc/secrets/google-service-account.json
       - key: GOOGLE_CALENDAR_SCOPES
         value: https://www.googleapis.com/auth/calendar
-    disks:
-      - name: hvac-ops-media
-        mountPath: /opt/render/project/src/media
-        sizeGB: 1
+    disk:
+      name: hvac-ops-media
+      mountPath: /opt/render/project/src/media
+      sizeGB: 1
