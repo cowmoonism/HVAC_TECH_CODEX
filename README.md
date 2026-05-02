@@ -205,6 +205,20 @@ Build the frontend:
 npm run build
 ```
 
+## GitHub CI
+
+The repository includes a GitHub Actions workflow at [.github/workflows/ci.yml](/C:/HVAC_TECH_CODEX/.github/workflows/ci.yml) that runs on pushes and pull requests to `main`.
+
+It currently checks:
+
+- backend dependency install
+- `python manage.py check`
+- `python manage.py test`
+- frontend dependency install
+- `npm run build`
+
+A pull request template is also included at [.github/pull_request_template.md](/C:/HVAC_TECH_CODEX/.github/pull_request_template.md) to keep validation and rollout notes consistent.
+
 Frontend routes:
 
 ```text
