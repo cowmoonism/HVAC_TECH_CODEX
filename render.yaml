@@ -2,7 +2,7 @@ databases:
   - name: hvac-ops-db
     databaseName: hvac_ops
     user: hvac_ops
-    plan: starter
+    plan: free
 
 services:
   - type: web
