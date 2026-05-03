@@ -196,6 +196,9 @@ def sync_google_calendar_for_technician(technician_id, start_date=None, end_date
     return summary
 
 
+WORK_REPORT_BLOCK_START = "--- Work Report Submitted ---"
+
+
 def update_google_event_description(calendar_event_id, appended_text):
     service = get_google_calendar_service()
     if service is None:
@@ -224,10 +227,7 @@ def update_google_event_description(calendar_event_id, appended_text):
         ).execute()
         existing_description = google_event.get("description") or ""
         appended_text = appended_text.strip()
-        if existing_description.strip():
-            google_event["description"] = f"{existing_description.rstrip()}\n\n{appended_text}"
-        else:
-            google_event["description"] = appended_text
+        google_event["description"] = _replace_managed_work_report_block(existing_description, appended_text)
 
         service.events().update(
             calendarId=calendar_event.google_calendar_id,
@@ -253,8 +253,9 @@ def update_google_event_description(calendar_event_id, appended_text):
         _audit_calendar_update(calendar_event_id=calendar_event.id, success=False, appended_text=appended_text)
         return False
 
+    calendar_event.description = google_event["description"]
     calendar_event.last_synced_at = timezone.now()
-    calendar_event.save(update_fields=["last_synced_at", "updated_at"])
+    calendar_event.save(update_fields=["description", "last_synced_at", "updated_at"])
     logger.info(
         "Updated Google Calendar event %s on calendar %s for CalendarEvent %s.",
         calendar_event.google_event_id,
@@ -269,6 +270,22 @@ def update_google_event_description(calendar_event_id, appended_text):
         google_event_id=calendar_event.google_event_id,
     )
     return True
+
+
+def _replace_managed_work_report_block(existing_description, new_block):
+    existing_description = (existing_description or "").rstrip()
+    new_block = (new_block or "").strip()
+    if not existing_description:
+        return new_block
+
+    marker_index = existing_description.find(WORK_REPORT_BLOCK_START)
+    if marker_index == -1:
+        return f"{existing_description}\n\n{new_block}"
+
+    base_description = existing_description[:marker_index].rstrip()
+    if not base_description:
+        return new_block
+    return f"{base_description}\n\n{new_block}"
 
 
 def _audit_calendar_sync(*, technician_id, summary):

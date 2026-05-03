@@ -4,7 +4,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from calendar_sync.models import CalendarEvent, CalendarEventStatus, CalendarEventType
-from calendar_sync.services import build_technician_schedule_message
+from calendar_sync.services import _replace_managed_work_report_block, build_technician_schedule_message
 from technicians.models import Technician
 
 
@@ -70,3 +70,36 @@ class ScheduleMessageTests(TestCase):
         self.assertNotIn("Canceled Job", message)
         self.assertNotIn("Rescheduled Job", message)
         self.assertNotIn("Fake Job", message)
+
+
+class GoogleCalendarDescriptionTests(TestCase):
+    def test_replace_managed_work_report_block(self):
+        existing = "\n".join(
+            [
+                "Customer details",
+                "Original dispatch notes",
+                "",
+                "--- Work Report Submitted ---",
+                "Job number: OLD",
+                "Comments: old report",
+            ]
+        )
+        new_block = "\n".join(
+            [
+                "--- Work Report Submitted ---",
+                "Job number: NEW",
+                "Comments: new report",
+            ]
+        )
+
+        description = _replace_managed_work_report_block(existing, new_block)
+
+        self.assertIn("Customer details", description)
+        self.assertIn("Original dispatch notes", description)
+        self.assertIn("Job number: NEW", description)
+        self.assertNotIn("Job number: OLD", description)
+
+    def test_append_managed_work_report_block_when_missing(self):
+        description = _replace_managed_work_report_block("Customer details", "--- Work Report Submitted ---\nJob number: NEW")
+
+        self.assertEqual(description, "Customer details\n\n--- Work Report Submitted ---\nJob number: NEW")

@@ -71,4 +71,5 @@ class ReportSubmissionService:
         except Exception as exc:
             logger.error("Report calendar update failed for report %s: %s", work_report.id, exc, exc_info=True)
 
+        work_report.refresh_from_db()
         return work_report
