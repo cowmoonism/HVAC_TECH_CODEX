@@ -41,6 +41,56 @@
       color: var(--muted);
       font-size: 14px;
     }
+    .event-picker {
+      margin: 0 0 14px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      box-shadow: 0 8px 24px rgba(20, 32, 50, 0.08);
+    }
+    .event-picker h2 {
+      margin: 0 0 8px;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+    .event-picker p {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .event-list {
+      display: grid;
+      gap: 8px;
+    }
+    .event-option {
+      width: 100%;
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: var(--text);
+      background: #fbfcfe;
+      text-align: left;
+      font-weight: 400;
+    }
+    .event-option strong,
+    .event-option span {
+      display: block;
+    }
+    .event-option strong {
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .event-option span {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .event-option.selected {
+      border-color: var(--accent);
+      background: #ecfdf3;
+    }
     form {
       background: var(--surface);
       border: 1px solid var(--line);
@@ -86,14 +136,6 @@
     }
     button:disabled { opacity: 0.65; }
     button:not(:disabled):active { background: var(--accent-dark); }
-    .notice {
-      margin: 0 0 14px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      background: #fff7ed;
-      color: #9a3412;
-      font-size: 13px;
-    }
     .result {
       display: none;
       margin-top: 14px;
@@ -118,7 +160,6 @@
   <main>
     <h1>{{ title }}</h1>
     <p class="subtitle">Submitted securely to the HVAC Operations backend.</p>
-    <p class="notice">{{ insecure_secret_warning }}</p>
     {% block form %}{% endblock %}
   </main>
   <script>
@@ -179,7 +220,89 @@
       }
     }
 
+    function setFieldValue(id, value) {
+      const field = document.getElementById(id);
+      if (field && value !== undefined && value !== null) {
+        field.value = value;
+      }
+    }
+
+    function localDateValue(isoValue) {
+      if (!isoValue) return "";
+      const date = new Date(isoValue);
+      if (Number.isNaN(date.getTime())) return "";
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+
+    function applyCalendarEvent(eventData) {
+      setFieldValue("google_event_id", eventData.google_event_id);
+      setFieldValue("job_number", eventData.job_number || "");
+      setFieldValue("address", eventData.location || "");
+      setFieldValue("customer_address", eventData.location || "");
+      setFieldValue("report_date", localDateValue(eventData.start_at));
+      setFieldValue("contract_date", localDateValue(eventData.start_at));
+    }
+
+    async function loadCalendarEvents() {
+      const picker = document.getElementById("calendar-event-picker");
+      const list = document.getElementById("calendar-event-list");
+      if (!picker || !list) return;
+
+      try {
+        const initData = telegramWebApp ? telegramWebApp.initData : "";
+        const submissionToken = new URLSearchParams(window.location.search).get("submission_token") || "";
+        const response = await fetch("/api/technician/calendar-events/?days_ahead=14", {
+          headers: {
+            "X-Telegram-WebApp-InitData": initData,
+            "X-Technician-Form-Token": submissionToken
+          }
+        });
+        const data = await response.json();
+        if (!response.ok) throw data;
+        if (!data.events || !data.events.length) {
+          list.textContent = "";
+          const empty = document.createElement("p");
+          empty.textContent = "No upcoming active jobs found.";
+          list.appendChild(empty);
+          return;
+        }
+        list.innerHTML = "";
+        data.events.forEach((eventData, index) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "event-option";
+          const title = document.createElement("strong");
+          title.textContent = `${index + 1}. ${eventData.title || "Untitled job"}`;
+          const time = document.createElement("span");
+          time.textContent = eventData.time_label || "";
+          const location = document.createElement("span");
+          location.textContent = eventData.location || "No address";
+          button.append(title, time, location);
+          if (eventData.report_count) {
+            const reportCount = document.createElement("span");
+            reportCount.textContent = `Report already submitted: ${eventData.report_count}`;
+            button.append(reportCount);
+          }
+          button.addEventListener("click", () => {
+            document.querySelectorAll(".event-option").forEach((item) => item.classList.remove("selected"));
+            button.classList.add("selected");
+            applyCalendarEvent(eventData);
+          });
+          list.appendChild(button);
+        });
+      } catch (error) {
+        list.textContent = "";
+        const message = document.createElement("p");
+        message.textContent = `Could not load jobs: ${formatError(error)}`;
+        list.appendChild(message);
+      }
+    }
+
     document.querySelector("form").addEventListener("submit", submitTechnicianForm);
+    loadCalendarEvents();
   </script>
 </body>
 </html>

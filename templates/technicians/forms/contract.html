@@ -3,6 +3,13 @@
 <form>
   <input type="hidden" name="telegram_user_id" value="{{ telegram_user_id }}">
   <input type="hidden" name="telegram_group_chat_id" value="{{ telegram_group_chat_id }}">
+  <section id="calendar-event-picker" class="event-picker">
+    <h2>Choose Job</h2>
+    <p>Select the calendar job first. The form will prefill the event, date, and customer address.</p>
+    <div id="calendar-event-list" class="event-list">
+      <p>Loading jobs...</p>
+    </div>
+  </section>
   <div class="grid two">
     <div>
       <label for="contract_date">Contract Date</label>
@@ -10,7 +17,7 @@
     </div>
     <div>
       <label for="google_event_id">Google Event ID</label>
-      <input id="google_event_id" name="google_event_id" type="text">
+      <input id="google_event_id" name="google_event_id" type="text" readonly>
     </div>
     <div class="full">
       <label for="customer_name">Customer Name</label>

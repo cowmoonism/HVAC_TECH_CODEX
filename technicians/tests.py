@@ -9,6 +9,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
+from calendar_sync.models import CalendarEvent, CalendarEventStatus, CalendarEventType
 from reports.models import WorkReport
 from technicians.form_tokens import create_technician_form_token
 from technicians.models import (
@@ -179,6 +180,63 @@ class TechnicianSubmissionAuthTests(TestCase):
         self.assertEqual(response.status_code, 201)
         work_report = WorkReport.objects.latest("id")
         self.assertEqual(work_report.technician_id, self.technician.id)
+
+    @override_settings(DEBUG=False, TECHNICIAN_API_SHARED_SECRET="shared-secret")
+    def test_signed_form_token_can_list_active_calendar_events(self):
+        active_event = CalendarEvent.objects.create(
+            technician=self.technician,
+            google_calendar_id="calendar@example.com",
+            google_event_id="google-active-1",
+            event_type=CalendarEventType.JOB,
+            status=CalendarEventStatus.SCHEDULED,
+            title="1. Active Duct Cleaning",
+            location="100 Test Ave",
+            start_at=timezone.now() + timedelta(days=1),
+            end_at=timezone.now() + timedelta(days=1, hours=2),
+            job_number="1",
+        )
+        CalendarEvent.objects.create(
+            technician=self.technician,
+            google_calendar_id="calendar@example.com",
+            google_event_id="google-canceled-1",
+            event_type=CalendarEventType.JOB,
+            status=CalendarEventStatus.CANCELED,
+            title="2. Cancel hidden",
+            location="200 Test Ave",
+            start_at=timezone.now() + timedelta(days=1),
+            end_at=timezone.now() + timedelta(days=1, hours=2),
+            job_number="2",
+        )
+        WorkReport.objects.create(
+            technician=self.technician,
+            calendar_event=active_event,
+            report_date=timezone.localdate(),
+            payment_type="CASH",
+            amount="25.00",
+            closed_by="TECHNICIAN",
+            groupon_review="NO",
+            google_review="NO",
+            yearly_maintenance_plan="NO",
+        )
+        token = create_technician_form_token(
+            {
+                "telegram_user_id": self.technician.telegram_user_id,
+                "telegram_group_chat_id": self.technician.telegram_group_chat_id,
+            },
+            "shared-secret",
+        )
+
+        response = self.client.get(
+            "/api/technician/calendar-events/",
+            HTTP_X_TECHNICIAN_FORM_TOKEN=token,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        events = response.json()["events"]
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["google_event_id"], "google-active-1")
+        self.assertEqual(events[0]["location"], "100 Test Ave")
+        self.assertEqual(events[0]["report_count"], 1)
 
     def _build_init_data(self, *, bot_token, user_id, auth_date):
         payload = {
