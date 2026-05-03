@@ -15,6 +15,7 @@ from aiogram.types import (
 
 from telegram_bots.technician_bot.client import claim_registration, complete_registration
 from telegram_bots.technician_bot.config import get_settings
+from technicians.form_tokens import create_technician_form_token
 
 
 router = Router()
@@ -33,15 +34,23 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
-def form_links_keyboard(user_id: int, chat_id: int) -> InlineKeyboardMarkup:
+def form_links_keyboard(user_id: int, chat_id: int, *, web_app: bool = True) -> InlineKeyboardMarkup:
+    if web_app:
+        report_button = InlineKeyboardButton(text="Submit Report", web_app=WebAppInfo(url=_form_url("report", user_id, chat_id)))
+        expense_button = InlineKeyboardButton(text="Submit Expense", web_app=WebAppInfo(url=_form_url("expense", user_id, chat_id)))
+        contract_button = InlineKeyboardButton(text="Receipt / Contract", web_app=WebAppInfo(url=_form_url("contract", user_id, chat_id)))
+    else:
+        report_button = InlineKeyboardButton(text="Submit Report", callback_data="open_form:report")
+        expense_button = InlineKeyboardButton(text="Submit Expense", callback_data="open_form:expense")
+        contract_button = InlineKeyboardButton(text="Receipt / Contract", callback_data="open_form:contract")
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="Submit Report", web_app=WebAppInfo(url=_form_url("report", user_id, chat_id))),
-                InlineKeyboardButton(text="Submit Expense", web_app=WebAppInfo(url=_form_url("expense", user_id, chat_id))),
+                report_button,
+                expense_button,
             ],
             [
-                InlineKeyboardButton(text="Receipt / Contract", web_app=WebAppInfo(url=_form_url("contract", user_id, chat_id))),
+                contract_button,
                 InlineKeyboardButton(text="My ID", callback_data="my_id"),
             ],
         ]
@@ -49,7 +58,7 @@ def form_links_keyboard(user_id: int, chat_id: int) -> InlineKeyboardMarkup:
 
 
 def technician_panel_keyboard(user_id: int, chat_id: int) -> InlineKeyboardMarkup:
-    return form_links_keyboard(user_id=user_id, chat_id=chat_id)
+    return form_links_keyboard(user_id=user_id, chat_id=chat_id, web_app=False)
 
 
 def _form_url(form_name: str, user_id: int, chat_id: int) -> str:
@@ -61,6 +70,21 @@ def _form_url(form_name: str, user_id: int, chat_id: int) -> str:
             "telegram_group_chat_id": chat_id,
         }
     )
+    return f"{urljoin(settings.backend_public_base_url.rstrip('/') + '/', path.lstrip('/'))}?{query}"
+
+
+def _signed_form_url(form_name: str, user_id: int, chat_id: int) -> str:
+    settings = get_settings()
+    token = create_technician_form_token(
+        {
+            "form": form_name,
+            "telegram_user_id": str(user_id),
+            "telegram_group_chat_id": str(chat_id),
+        },
+        settings.technician_api_shared_secret,
+    )
+    path = f"/technician/forms/{form_name}/"
+    query = urlencode({"submission_token": token, "telegram_group_chat_id": chat_id})
     return f"{urljoin(settings.backend_public_base_url.rstrip('/') + '/', path.lstrip('/'))}?{query}"
 
 
@@ -90,7 +114,7 @@ async def start(message: Message, command: CommandObject | None = None) -> None:
 
     await message.answer(
         "HVAC technician tools are ready. Choose a form below.",
-        reply_markup=technician_panel_keyboard(message.from_user.id, message.chat.id),
+        reply_markup=form_links_keyboard(message.from_user.id, message.chat.id, web_app=message.chat.type == "private"),
     )
 
 
@@ -105,6 +129,28 @@ async def menu(message: Message) -> None:
             await sent_message.pin(disable_notification=True)
         except Exception:
             await message.answer("Panel is ready. Pin it in this chat if you want it to stay at the top.")
+
+
+@router.callback_query(F.data.startswith("open_form:"))
+async def open_group_form(callback: CallbackQuery) -> None:
+    form_name = callback.data.split(":", 1)[1]
+    if form_name not in {"report", "expense", "contract"}:
+        await callback.answer("Unknown form.", show_alert=True)
+        return
+
+    url = _signed_form_url(form_name, callback.from_user.id, callback.message.chat.id)
+    labels = {
+        "report": "Submit Report",
+        "expense": "Submit Expense",
+        "contract": "Receipt / Contract",
+    }
+    await callback.message.answer(
+        f"{callback.from_user.full_name}, open your form:",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(text=labels[form_name], url=url)]]
+        ),
+    )
+    await callback.answer()
 
 
 @router.message(F.text == "My ID")
@@ -143,54 +189,57 @@ async def my_id_callback(callback: CallbackQuery) -> None:
 @router.message(F.text == "Submit Report")
 @router.message(Command("report"))
 async def submit_report_link(message: Message) -> None:
+    url = (
+        _form_url("report", message.from_user.id, message.chat.id)
+        if message.chat.type == "private"
+        else _signed_form_url("report", message.from_user.id, message.chat.id)
+    )
+    button = (
+        InlineKeyboardButton(text="Submit Report", web_app=WebAppInfo(url=url))
+        if message.chat.type == "private"
+        else InlineKeyboardButton(text="Submit Report", url=url)
+    )
     await message.answer(
         "Open the report form:",
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="Submit Report",
-                        web_app=WebAppInfo(url=_form_url("report", message.from_user.id, message.chat.id)),
-                    )
-                ]
-            ]
-        ),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[button]]),
     )
 
 
 @router.message(F.text == "Submit Expense")
 @router.message(Command("expense"))
 async def submit_expense_link(message: Message) -> None:
+    url = (
+        _form_url("expense", message.from_user.id, message.chat.id)
+        if message.chat.type == "private"
+        else _signed_form_url("expense", message.from_user.id, message.chat.id)
+    )
+    button = (
+        InlineKeyboardButton(text="Submit Expense", web_app=WebAppInfo(url=url))
+        if message.chat.type == "private"
+        else InlineKeyboardButton(text="Submit Expense", url=url)
+    )
     await message.answer(
         "Open the expense form:",
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="Submit Expense",
-                        web_app=WebAppInfo(url=_form_url("expense", message.from_user.id, message.chat.id)),
-                    )
-                ]
-            ]
-        ),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[button]]),
     )
 
 
 @router.message(F.text == "Receipt / Contract")
 @router.message(Command("contract"))
 async def receipt_contract_link(message: Message) -> None:
+    url = (
+        _form_url("contract", message.from_user.id, message.chat.id)
+        if message.chat.type == "private"
+        else _signed_form_url("contract", message.from_user.id, message.chat.id)
+    )
+    button = (
+        InlineKeyboardButton(text="Receipt / Contract", web_app=WebAppInfo(url=url))
+        if message.chat.type == "private"
+        else InlineKeyboardButton(text="Receipt / Contract", url=url)
+    )
     await message.answer(
         "Open the receipt / contract form:",
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="Receipt / Contract",
-                        web_app=WebAppInfo(url=_form_url("contract", message.from_user.id, message.chat.id)),
-                    )
-                ]
-            ]
-        ),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[button]]),
     )
 
 

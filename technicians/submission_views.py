@@ -10,6 +10,7 @@ from expenses.serializers import ExpenseReportSerializer
 from expenses.services import ExpenseSubmissionService
 from reports.serializers import WorkReportSerializer
 from reports.services import ReportSubmissionService
+from technicians.form_tokens import TechnicianFormTokenError, validate_technician_form_token
 from technicians.submission_serializers import (
     TechnicianContractSubmissionSerializer,
     TechnicianExpenseSubmissionSerializer,
@@ -22,6 +23,26 @@ class TechnicianSubmissionAuthMixin:
     permission_classes = [AllowAny]
 
     def authenticate_submission(self, request):
+        form_token = request.headers.get("X-Technician-Form-Token", "")
+        if form_token:
+            try:
+                token_data = validate_technician_form_token(form_token, settings.TECHNICIAN_API_SHARED_SECRET)
+            except TechnicianFormTokenError as exc:
+                return None, Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+
+            telegram_user_id = token_data.get("telegram_user_id")
+            if not telegram_user_id:
+                return None, Response(
+                    {"detail": "Technician form token does not include telegram_user_id."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            data = request.data.copy()
+            data["telegram_user_id"] = str(telegram_user_id)
+            if token_data.get("telegram_group_chat_id"):
+                data["telegram_group_chat_id"] = str(token_data["telegram_group_chat_id"])
+            return data, None
+
         init_data = request.headers.get("X-Telegram-WebApp-InitData", "")
         if init_data:
             try:

@@ -155,11 +155,13 @@
 
       try {
         const initData = telegramWebApp ? telegramWebApp.initData : "";
+        const submissionToken = new URLSearchParams(window.location.search).get("submission_token") || "";
         const response = await fetch(endpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-Telegram-WebApp-InitData": initData
+            "X-Telegram-WebApp-InitData": initData,
+            "X-Technician-Form-Token": submissionToken
           },
           body: JSON.stringify(getFormPayload(form))
         });

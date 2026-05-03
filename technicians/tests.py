@@ -10,6 +10,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import UserRole
 from reports.models import WorkReport
+from technicians.form_tokens import create_technician_form_token
 from technicians.models import (
     Technician,
     TechnicianStatus,
@@ -153,6 +154,31 @@ class TechnicianSubmissionAuthTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["technician"], self.technician.id)
+
+    @override_settings(DEBUG=False, TECHNICIAN_API_SHARED_SECRET="shared-secret")
+    def test_signed_form_token_works_without_init_data(self):
+        token = create_technician_form_token(
+            {
+                "telegram_user_id": self.technician.telegram_user_id,
+                "telegram_group_chat_id": self.technician.telegram_group_chat_id,
+            },
+            "shared-secret",
+        )
+        payload = {
+            **self.payload,
+            "telegram_user_id": "untrusted-body-value",
+        }
+
+        response = self.client.post(
+            "/api/technician/submit-work-report/",
+            payload,
+            format="json",
+            HTTP_X_TECHNICIAN_FORM_TOKEN=token,
+        )
+
+        self.assertEqual(response.status_code, 201)
+        work_report = WorkReport.objects.latest("id")
+        self.assertEqual(work_report.technician_id, self.technician.id)
 
     def _build_init_data(self, *, bot_token, user_id, auth_date):
         payload = {
