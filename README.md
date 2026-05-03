@@ -205,6 +205,12 @@ Recommended flow:
 
 After Telegram registration and `google_calendar_id` are present, the technician can be activated.
 
+Technician form access:
+
+- In the technician's work group, the bot posts a pinned technician panel. Group buttons use short-lived signed links because Telegram does not allow WebApp inline buttons in group/supergroup chats.
+- In the technician's private chat with the bot, the bot configures Telegram's persistent menu/Play button to open the technician Mini App at `/technician/forms/app/`.
+- The Mini App links to the report, expense, and receipt/contract forms. Private-chat submissions use Telegram WebApp `initData`; group-opened links use signed form tokens.
+
 Environment for this flow:
 
 - `TECHNICIAN_BOT_TOKEN`

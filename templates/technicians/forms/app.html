@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --text: #162033;
+      --muted: #65738a;
+      --line: #d8dee9;
+      --accent: #0f766e;
+      --accent-dark: #0b5f59;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.4;
+    }
+    main {
+      width: min(720px, 100%);
+      margin: 0 auto;
+      padding: 20px 14px 40px;
+    }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 26px;
+      letter-spacing: 0;
+    }
+    .subtitle {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 8px 24px rgba(20, 32, 50, 0.08);
+    }
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    @media (min-width: 520px) {
+      .actions { grid-template-columns: 1fr 1fr; }
+    }
+    a, button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      border: 0;
+      border-radius: 8px;
+      padding: 13px 14px;
+      font: inherit;
+      font-weight: 700;
+      text-decoration: none;
+      color: #fff;
+      background: var(--accent);
+    }
+    a:active, button:active { background: var(--accent-dark); }
+    .secondary {
+      color: var(--text);
+      background: #eef2f7;
+    }
+    .secondary:active { background: #e2e8f0; }
+    .identity {
+      margin-top: 16px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      color: var(--muted);
+      font-size: 14px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>{{ title }}</h1>
+    <p class="subtitle">Open forms from your Telegram work chat or private bot menu.</p>
+    <section class="panel">
+      <div class="actions">
+        <a id="report-link" href="/technician/forms/report/">Submit Report</a>
+        <a id="expense-link" href="/technician/forms/expense/">Submit Expense</a>
+        <a id="contract-link" href="/technician/forms/contract/">Receipt / Contract</a>
+        <button id="identity-button" type="button" class="secondary">My ID</button>
+      </div>
+      <div id="identity" class="identity">Telegram identity will appear here when opened inside Telegram.</div>
+    </section>
+  </main>
+  <script>
+    const telegramWebApp = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+    if (telegramWebApp) {
+      telegramWebApp.ready();
+      telegramWebApp.expand();
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const submissionToken = params.get("submission_token") || "{{ submission_token|escapejs }}";
+    const telegramGroupChatId = params.get("telegram_group_chat_id") || "{{ telegram_group_chat_id|escapejs }}";
+    const telegramUserId = params.get("telegram_user_id") || "{{ telegram_user_id|escapejs }}";
+
+    function buildFormUrl(formName) {
+      const query = new URLSearchParams();
+      if (submissionToken) query.set("submission_token", submissionToken);
+      if (telegramGroupChatId) query.set("telegram_group_chat_id", telegramGroupChatId);
+      if (telegramUserId) query.set("telegram_user_id", telegramUserId);
+      const suffix = query.toString();
+      return `/technician/forms/${formName}/${suffix ? `?${suffix}` : ""}`;
+    }
+
+    document.getElementById("report-link").href = buildFormUrl("report");
+    document.getElementById("expense-link").href = buildFormUrl("expense");
+    document.getElementById("contract-link").href = buildFormUrl("contract");
+
+    function renderIdentity() {
+      const user = telegramWebApp && telegramWebApp.initDataUnsafe ? telegramWebApp.initDataUnsafe.user : null;
+      const lines = [
+        "Telegram identity",
+        `User ID: ${user && user.id ? user.id : (telegramUserId || "N/A")}`,
+        `Chat ID: ${telegramGroupChatId || "N/A"}`,
+        `Username: ${user && user.username ? `@${user.username}` : "N/A"}`
+      ];
+      document.getElementById("identity").textContent = lines.join("\n");
+    }
+
+    document.getElementById("identity-button").addEventListener("click", renderIdentity);
+    renderIdentity();
+  </script>
+</body>
+</html>

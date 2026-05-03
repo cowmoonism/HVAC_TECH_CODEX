@@ -58,19 +58,49 @@ def form_links_keyboard(user_id: int, chat_id: int, *, web_app: bool = True) -> 
 
 
 def technician_panel_keyboard(user_id: int, chat_id: int) -> InlineKeyboardMarkup:
-    return form_links_keyboard(user_id=user_id, chat_id=chat_id, web_app=False)
+    keyboard = form_links_keyboard(user_id=user_id, chat_id=chat_id, web_app=False).inline_keyboard
+    keyboard.insert(0, [InlineKeyboardButton(text="Open Technician App", callback_data="open_app")])
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
-def _form_url(form_name: str, user_id: int, chat_id: int) -> str:
+def technician_private_app_keyboard(user_id: int, chat_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Open Technician App", web_app=WebAppInfo(url=_app_url(user_id, chat_id)))],
+            [
+                InlineKeyboardButton(text="Submit Report", web_app=WebAppInfo(url=_form_url("report", user_id, chat_id))),
+                InlineKeyboardButton(text="Submit Expense", web_app=WebAppInfo(url=_form_url("expense", user_id, chat_id))),
+            ],
+            [InlineKeyboardButton(text="Receipt / Contract", web_app=WebAppInfo(url=_form_url("contract", user_id, chat_id)))],
+        ]
+    )
+
+
+def _build_public_url(path: str, query_params: dict[str, object] | None = None) -> str:
     settings = get_settings()
-    path = f"/technician/forms/{form_name}/"
-    query = urlencode(
+    query = urlencode(query_params or {})
+    url = urljoin(settings.backend_public_base_url.rstrip("/") + "/", path.lstrip("/"))
+    return f"{url}?{query}" if query else url
+
+
+def _app_url(user_id: int, chat_id: int) -> str:
+    return _build_public_url(
+        "/technician/forms/app/",
         {
             "telegram_user_id": user_id,
             "telegram_group_chat_id": chat_id,
-        }
+        },
     )
-    return f"{urljoin(settings.backend_public_base_url.rstrip('/') + '/', path.lstrip('/'))}?{query}"
+
+
+def _form_url(form_name: str, user_id: int, chat_id: int) -> str:
+    return _build_public_url(
+        f"/technician/forms/{form_name}/",
+        {
+            "telegram_user_id": user_id,
+            "telegram_group_chat_id": chat_id,
+        },
+    )
 
 
 def _signed_form_url(form_name: str, user_id: int, chat_id: int) -> str:
@@ -83,9 +113,26 @@ def _signed_form_url(form_name: str, user_id: int, chat_id: int) -> str:
         },
         settings.technician_api_shared_secret,
     )
-    path = f"/technician/forms/{form_name}/"
-    query = urlencode({"submission_token": token, "telegram_group_chat_id": chat_id})
-    return f"{urljoin(settings.backend_public_base_url.rstrip('/') + '/', path.lstrip('/'))}?{query}"
+    return _build_public_url(
+        f"/technician/forms/{form_name}/",
+        {"submission_token": token, "telegram_group_chat_id": chat_id},
+    )
+
+
+def _signed_app_url(user_id: int, chat_id: int) -> str:
+    settings = get_settings()
+    token = create_technician_form_token(
+        {
+            "form": "app",
+            "telegram_user_id": str(user_id),
+            "telegram_group_chat_id": str(chat_id),
+        },
+        settings.technician_api_shared_secret,
+    )
+    return _build_public_url(
+        "/technician/forms/app/",
+        {"submission_token": token, "telegram_group_chat_id": chat_id},
+    )
 
 
 @router.message(CommandStart())
@@ -114,7 +161,11 @@ async def start(message: Message, command: CommandObject | None = None) -> None:
 
     await message.answer(
         "HVAC technician tools are ready. Choose a form below.",
-        reply_markup=form_links_keyboard(message.from_user.id, message.chat.id, web_app=message.chat.type == "private"),
+        reply_markup=(
+            technician_private_app_keyboard(message.from_user.id, message.chat.id)
+            if message.chat.type == "private"
+            else technician_panel_keyboard(message.from_user.id, message.chat.id)
+        ),
     )
 
 
@@ -148,6 +199,18 @@ async def open_group_form(callback: CallbackQuery) -> None:
         f"{callback.from_user.full_name}, open your form:",
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[[InlineKeyboardButton(text=labels[form_name], url=url)]]
+        ),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "open_app")
+async def open_group_app(callback: CallbackQuery) -> None:
+    url = _signed_app_url(callback.from_user.id, callback.message.chat.id)
+    await callback.message.answer(
+        f"{callback.from_user.full_name}, open your technician app:",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(text="Open Technician App", url=url)]]
         ),
     )
     await callback.answer()

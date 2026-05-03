@@ -7,16 +7,24 @@ from reports.models import ClosedBy, PaymentType, ReviewStatus
 
 
 def _base_context(request, title, endpoint):
+    submission_token = request.GET.get("submission_token", "")
+    telegram_group_chat_id = request.GET.get("telegram_group_chat_id", "")
     return {
         "title": title,
         "endpoint": endpoint,
         "telegram_user_id": request.GET.get("telegram_user_id", ""),
-        "telegram_group_chat_id": request.GET.get("telegram_group_chat_id", ""),
+        "telegram_group_chat_id": telegram_group_chat_id,
+        "submission_token": submission_token,
         "insecure_secret_warning": (
             "Production submissions are authenticated with Telegram WebApp initData. "
             "Local DEBUG mode can still use the shared-secret fallback outside Telegram."
         ),
     }
+
+
+def technician_app(request):
+    context = _base_context(request, "Technician App", "")
+    return render(request, "technicians/forms/app.html", context)
 
 
 def report_form(request):
