@@ -27,6 +27,7 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
             [KeyboardButton(text="Receipt / Contract"), KeyboardButton(text="My ID")],
             [KeyboardButton(text="Complete Registration")],
         ],
+        is_persistent=True,
         resize_keyboard=True,
         input_field_placeholder="Choose an action",
     )
@@ -45,6 +46,10 @@ def form_links_keyboard(user_id: int, chat_id: int) -> InlineKeyboardMarkup:
             ],
         ]
     )
+
+
+def technician_panel_keyboard(user_id: int, chat_id: int) -> InlineKeyboardMarkup:
+    return form_links_keyboard(user_id=user_id, chat_id=chat_id)
 
 
 def _form_url(form_name: str, user_id: int, chat_id: int) -> str:
@@ -85,8 +90,21 @@ async def start(message: Message, command: CommandObject | None = None) -> None:
 
     await message.answer(
         "HVAC technician tools are ready. Choose a form below.",
-        reply_markup=form_links_keyboard(message.from_user.id, message.chat.id),
+        reply_markup=technician_panel_keyboard(message.from_user.id, message.chat.id),
     )
+
+
+@router.message(Command("menu"))
+async def menu(message: Message) -> None:
+    sent_message = await message.answer(
+        "Technician panel",
+        reply_markup=technician_panel_keyboard(message.from_user.id, message.chat.id),
+    )
+    if message.chat.type in {"group", "supergroup"}:
+        try:
+            await sent_message.pin(disable_notification=True)
+        except Exception:
+            await message.answer("Panel is ready. Pin it in this chat if you want it to stay at the top.")
 
 
 @router.message(F.text == "My ID")
@@ -123,6 +141,7 @@ async def my_id_callback(callback: CallbackQuery) -> None:
 
 
 @router.message(F.text == "Submit Report")
+@router.message(Command("report"))
 async def submit_report_link(message: Message) -> None:
     await message.answer(
         "Open the report form:",
@@ -140,6 +159,7 @@ async def submit_report_link(message: Message) -> None:
 
 
 @router.message(F.text == "Submit Expense")
+@router.message(Command("expense"))
 async def submit_expense_link(message: Message) -> None:
     await message.answer(
         "Open the expense form:",
@@ -157,6 +177,7 @@ async def submit_expense_link(message: Message) -> None:
 
 
 @router.message(F.text == "Receipt / Contract")
+@router.message(Command("contract"))
 async def receipt_contract_link(message: Message) -> None:
     await message.answer(
         "Open the receipt / contract form:",
@@ -199,3 +220,11 @@ async def complete_registration_handler(message: Message) -> None:
     await message.answer(
         "Registration complete. This work chat is now linked to your technician profile."
     )
+    sent_message = await message.answer(
+        "Technician panel",
+        reply_markup=technician_panel_keyboard(message.from_user.id, message.chat.id),
+    )
+    try:
+        await sent_message.pin(disable_notification=True)
+    except Exception:
+        await message.answer("Panel is ready. Pin it in this chat if you want it to stay at the top.")
