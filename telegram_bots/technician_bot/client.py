@@ -18,6 +18,12 @@ class TechnicianBackendClient:
     def submit_contract(self, payload: dict) -> dict:
         return self._post("/api/technician/submit-contract/", payload)
 
+    def claim_registration(self, payload: dict) -> dict:
+        return self._post("/api/technician-bot/claim-registration/", payload, bot_registration=True)
+
+    def complete_registration(self, payload: dict) -> dict:
+        return self._post("/api/technician-bot/complete-registration/", payload, bot_registration=True)
+
     def build_url(self, path: str) -> str:
         return urljoin(self.settings.backend_api_base_url.rstrip("/") + "/", path.lstrip("/"))
 
@@ -27,11 +33,17 @@ class TechnicianBackendClient:
             "Content-Type": "application/json",
         }
 
-    def _post(self, path: str, payload: dict) -> dict:
+    def bot_headers(self) -> dict:
+        return {
+            "X-Technician-Bot-Secret": self.settings.technician_api_shared_secret,
+            "Content-Type": "application/json",
+        }
+
+    def _post(self, path: str, payload: dict, *, bot_registration: bool = False) -> dict:
         response = requests.post(
             self.build_url(path),
             json=payload,
-            headers=self.headers(),
+            headers=self.bot_headers() if bot_registration else self.headers(),
             timeout=15,
         )
         response.raise_for_status()
@@ -48,3 +60,11 @@ def submit_expense(payload: dict) -> dict:
 
 def submit_contract(payload: dict) -> dict:
     return TechnicianBackendClient().submit_contract(payload)
+
+
+def claim_registration(payload: dict) -> dict:
+    return TechnicianBackendClient().claim_registration(payload)
+
+
+def complete_registration(payload: dict) -> dict:
+    return TechnicianBackendClient().complete_registration(payload)

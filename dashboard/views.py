@@ -17,6 +17,7 @@ from dashboard.permissions import DashboardPermission
 from expenses.models import ExpenseReport
 from reports.models import WorkReport
 from technicians.models import Technician, TechnicianStatus
+from technicians.serializers import latest_telegram_registration_payload
 
 
 ZERO = Decimal("0.00")
@@ -194,6 +195,7 @@ class TechnicianDetailView(APIView):
 
         data = {
             "technician": _technician_payload(technician),
+            "telegram_registration": latest_telegram_registration_payload(technician),
             "upcoming_calendar_events": [
                 _calendar_event_payload(event)
                 for event in CalendarEvent.objects.select_related("technician")

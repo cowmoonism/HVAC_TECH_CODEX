@@ -1,11 +1,15 @@
 from rest_framework import serializers
 
 from reports.models import WorkReport
+from technicians.validators import MAX_TEXT_LENGTH, validate_non_negative_amount
 
 
 class WorkReportSerializer(serializers.ModelSerializer):
     technician_display_name = serializers.SerializerMethodField()
     calendar_event_title = serializers.SerializerMethodField()
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    project_description = serializers.CharField(required=False, allow_blank=True, max_length=MAX_TEXT_LENGTH)
+    comments = serializers.CharField(required=False, allow_blank=True, max_length=MAX_TEXT_LENGTH)
 
     class Meta:
         model = WorkReport
@@ -52,3 +56,6 @@ class WorkReportSerializer(serializers.ModelSerializer):
         if not obj.calendar_event_id:
             return None
         return obj.calendar_event.title
+
+    def validate_amount(self, value):
+        return validate_non_negative_amount(value)

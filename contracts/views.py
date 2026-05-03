@@ -44,7 +44,7 @@ class ServiceContractViewSet(viewsets.ModelViewSet):
         return queryset
 
     def create(self, request, *args, **kwargs):
-        service_contract = ContractSubmissionService().submit_contract(request.data)
+        service_contract = ContractSubmissionService().submit_contract(request.data, actor=request.user)
         serializer = self.get_serializer(service_contract)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

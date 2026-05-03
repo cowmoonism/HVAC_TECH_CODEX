@@ -5,6 +5,7 @@ from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils import timezone
 
+from audit.services import log_audit_event
 from config.url_utils import build_public_url
 from contracts.models import ContractStatus, ServiceContract
 from contracts.serializers import ServiceContractSerializer
@@ -91,10 +92,22 @@ def send_contract_summary_to_telegram(service_contract_id):
 
 
 class ContractSubmissionService:
-    def submit_contract(self, data: dict):
+    def submit_contract(self, data: dict, *, actor=None):
         serializer = ServiceContractSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         service_contract = serializer.save()
+        log_audit_event(
+            "contract.create",
+            actor=actor,
+            target=f"service_contract:{service_contract.id}",
+            metadata={
+                "technician_id": service_contract.technician_id,
+                "calendar_event_id": service_contract.calendar_event_id,
+                "status": service_contract.status,
+                "contract_number": service_contract.contract_number,
+                "total": service_contract.total,
+            },
+        )
         try:
             send_contract_summary_to_telegram(service_contract.id)
         except Exception as exc:

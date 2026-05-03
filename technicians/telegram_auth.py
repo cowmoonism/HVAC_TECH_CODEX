@@ -1,7 +1,13 @@
 import hashlib
 import hmac
 import json
+from datetime import datetime, timedelta, timezone as dt_timezone
 from urllib.parse import parse_qsl
+
+from django.utils import timezone
+
+
+MAX_INIT_DATA_AGE_SECONDS = 600
 
 
 class TelegramWebAppAuthError(ValueError):
@@ -30,6 +36,18 @@ def validate_telegram_webapp_init_data(init_data: str, bot_token: str) -> dict:
 
     if not hmac.compare_digest(calculated_hash, received_hash):
         raise TelegramWebAppAuthError("Telegram WebApp initData hash is invalid.")
+
+    auth_date = parsed_data.get("auth_date")
+    if not auth_date:
+        raise TelegramWebAppAuthError("Telegram WebApp initData is missing auth_date.")
+    try:
+        auth_timestamp = int(auth_date)
+    except (TypeError, ValueError) as exc:
+        raise TelegramWebAppAuthError("Telegram WebApp initData auth_date is invalid.") from exc
+
+    auth_time = datetime.fromtimestamp(auth_timestamp, tz=dt_timezone.utc)
+    if timezone.now() - auth_time > timedelta(seconds=MAX_INIT_DATA_AGE_SECONDS):
+        raise TelegramWebAppAuthError("Telegram WebApp initData is too old.")
 
     if "user" in parsed_data:
         try:

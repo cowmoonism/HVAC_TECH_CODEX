@@ -1,9 +1,21 @@
+import hashlib
+import hmac
+import json
+from datetime import timedelta
+
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
-from technicians.models import Technician, TechnicianStatus
+from reports.models import WorkReport
+from technicians.models import (
+    Technician,
+    TechnicianStatus,
+    TechnicianTelegramRegistration,
+    TechnicianTelegramRegistrationStatus,
+)
 
 
 class TechnicianActivationTests(TestCase):
@@ -82,6 +94,54 @@ class TechnicianSubmissionAuthTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertIn("invalid", response.json()["detail"].lower())
 
+    @override_settings(DEBUG=False, TECHNICIAN_BOT_TOKEN="bot-token")
+    def test_old_init_data_is_rejected(self):
+        init_data = self._build_init_data(
+            bot_token="bot-token",
+            user_id=12345,
+            auth_date=int((timezone.now() - timedelta(minutes=11)).timestamp()),
+        )
+
+        response = self.client.post(
+            "/api/technician/submit-work-report/",
+            self.payload,
+            format="json",
+            HTTP_X_TELEGRAM_WEBAPP_INITDATA=init_data,
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("too old", response.json()["detail"].lower())
+
+    @override_settings(DEBUG=False, TECHNICIAN_BOT_TOKEN="bot-token")
+    def test_debug_false_ignores_body_telegram_user_id_when_init_data_present(self):
+        other_technician = Technician.objects.create(
+            first_name="Real",
+            last_name="Technician",
+            display_name="Real Technician",
+            telegram_user_id="67890",
+            telegram_group_chat_id="-10099999",
+        )
+        payload = {
+            **self.payload,
+            "telegram_user_id": "12345",
+        }
+        init_data = self._build_init_data(
+            bot_token="bot-token",
+            user_id=int(other_technician.telegram_user_id),
+            auth_date=int(timezone.now().timestamp()),
+        )
+
+        response = self.client.post(
+            "/api/technician/submit-work-report/",
+            payload,
+            format="json",
+            HTTP_X_TELEGRAM_WEBAPP_INITDATA=init_data,
+        )
+
+        self.assertEqual(response.status_code, 201)
+        work_report = WorkReport.objects.latest("id")
+        self.assertEqual(work_report.technician_id, other_technician.id)
+
     @override_settings(DEBUG=True, TECHNICIAN_API_SHARED_SECRET="shared-secret")
     def test_debug_shared_secret_fallback_works(self):
         response = self.client.post(
@@ -93,3 +153,93 @@ class TechnicianSubmissionAuthTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["technician"], self.technician.id)
+
+    def _build_init_data(self, *, bot_token, user_id, auth_date):
+        payload = {
+            "auth_date": str(auth_date),
+            "query_id": "AAHdF6IQAAAAAN0XohDhrOrc",
+            "user": json.dumps({"id": user_id}, separators=(",", ":")),
+        }
+        data_check_string = "\n".join(f"{key}={value}" for key, value in sorted(payload.items()))
+        secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+        payload["hash"] = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+        return "&".join(f"{key}={value}" for key, value in payload.items())
+
+
+@override_settings(TECHNICIAN_API_SHARED_SECRET="bot-shared-secret", TECHNICIAN_BOT_USERNAME="wa_test_bot")
+class TechnicianTelegramRegistrationTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="manager-2", password="password")
+        self.user.profile.role = UserRole.MANAGER
+        self.user.profile.save(update_fields=["role", "updated_at"])
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+        self.technician = Technician.objects.create(
+            first_name="Pending",
+            last_name="Tech",
+            display_name="Pending Tech",
+            status=TechnicianStatus.ONBOARDING,
+        )
+        self.bot_client = APIClient()
+
+    def test_manager_can_start_registration_and_bot_can_link_group(self):
+        start_response = self.client.post(
+            f"/api/technicians/{self.technician.id}/start-telegram-registration/",
+            {},
+            format="json",
+        )
+
+        self.assertEqual(start_response.status_code, 201)
+        token = start_response.json()["token"]
+        self.assertIn("https://t.me/wa_test_bot?start=", start_response.json()["bot_start_url"])
+
+        claim_response = self.bot_client.post(
+            "/api/technician-bot/claim-registration/",
+            {
+                "token": token,
+                "telegram_user_id": "777001",
+                "telegram_username": "pendingtech",
+            },
+            format="json",
+            HTTP_X_TECHNICIAN_BOT_SECRET="bot-shared-secret",
+        )
+        self.assertEqual(claim_response.status_code, 200)
+
+        complete_response = self.bot_client.post(
+            "/api/technician-bot/complete-registration/",
+            {
+                "telegram_user_id": "777001",
+                "telegram_username": "pendingtech",
+                "telegram_group_chat_id": "-100777001",
+                "telegram_group_title": "Pending Tech Work Chat",
+                "telegram_chat_type": "supergroup",
+            },
+            format="json",
+            HTTP_X_TECHNICIAN_BOT_SECRET="bot-shared-secret",
+        )
+        self.assertEqual(complete_response.status_code, 200)
+
+        self.technician.refresh_from_db()
+        self.assertEqual(self.technician.telegram_user_id, "777001")
+        self.assertEqual(self.technician.telegram_group_chat_id, "-100777001")
+
+        registration = TechnicianTelegramRegistration.objects.get(technician=self.technician)
+        self.assertEqual(registration.status, TechnicianTelegramRegistrationStatus.LINKED)
+        self.assertEqual(registration.telegram_group_title, "Pending Tech Work Chat")
+
+    def test_group_registration_requires_prior_claim(self):
+        response = self.bot_client.post(
+            "/api/technician-bot/complete-registration/",
+            {
+                "telegram_user_id": "555001",
+                "telegram_username": "orphantech",
+                "telegram_group_chat_id": "-100555001",
+                "telegram_group_title": "Orphan Tech Work Chat",
+                "telegram_chat_type": "supergroup",
+            },
+            format="json",
+            HTTP_X_TECHNICIAN_BOT_SECRET="bot-shared-secret",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("No claimed technician registration", response.json()["detail"])

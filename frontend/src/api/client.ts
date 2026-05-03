@@ -119,10 +119,26 @@ export type ServiceContract = {
 
 export type TechnicianDetail = {
   technician: Technician;
+  telegram_registration: TelegramRegistration;
   upcoming_calendar_events: CalendarEvent[];
   latest_work_reports: WorkReport[];
   latest_expenses?: ExpenseReport[];
   latest_contracts?: ServiceContract[];
+};
+
+export type TelegramRegistration = {
+  status: string;
+  token: string;
+  telegram_user_id: string;
+  telegram_username: string;
+  telegram_group_chat_id: string;
+  telegram_group_title: string;
+  telegram_chat_type: string;
+  claimed_at: string | null;
+  linked_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  bot_start_url: string;
 };
 
 export type ScheduleParams = {
@@ -335,6 +351,13 @@ export function createTechnician(payload: TechnicianPayload): Promise<Technician
 
 export function activateTechnician(id: string | number): Promise<Technician> {
   return request(`/api/technicians/${id}/activate/`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function startTelegramRegistration(id: string | number): Promise<TelegramRegistration> {
+  return request(`/api/technicians/${id}/start-telegram-registration/`, {
     method: "POST",
     body: JSON.stringify({}),
   });

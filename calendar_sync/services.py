@@ -10,6 +10,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+from audit.services import log_audit_event
 from calendar_sync.models import CalendarEvent, CalendarEventStatus, CalendarEventType
 from notifications.services import NotificationService, get_technician_group_chat
 from technicians.models import Technician
@@ -114,16 +115,19 @@ def sync_google_calendar_for_technician(technician_id, start_date=None, end_date
     except Technician.DoesNotExist:
         summary["error"] = f"Technician {technician_id} does not exist."
         logger.error(summary["error"])
+        _audit_calendar_sync(technician_id=technician_id, summary=summary)
         return summary
 
     if not technician.google_calendar_id:
         summary["error"] = f"Technician {technician.id} does not have a Google Calendar id configured."
         logger.error(summary["error"])
+        _audit_calendar_sync(technician_id=technician.id, summary=summary)
         return summary
 
     service = get_google_calendar_service()
     if service is None:
         summary["error"] = "Google Calendar credentials are not available."
+        _audit_calendar_sync(technician_id=technician.id, summary=summary)
         return summary
 
     start_dt, end_dt = _build_sync_window(start_date, end_date)
@@ -139,10 +143,12 @@ def sync_google_calendar_for_technician(technician_id, start_date=None, end_date
     except HttpError as exc:
         summary["error"] = f"Google Calendar API failed while listing events: {exc}"
         logger.error(summary["error"], exc_info=True)
+        _audit_calendar_sync(technician_id=technician.id, summary=summary)
         return summary
     except Exception as exc:
         summary["error"] = f"Unexpected failure while listing Google Calendar events: {exc}"
         logger.error(summary["error"], exc_info=True)
+        _audit_calendar_sync(technician_id=technician.id, summary=summary)
         return summary
 
     for google_event in response.get("items", []):
@@ -186,18 +192,21 @@ def sync_google_calendar_for_technician(technician_id, start_date=None, end_date
         technician.id,
         summary,
     )
+    _audit_calendar_sync(technician_id=technician.id, summary=summary)
     return summary
 
 
 def update_google_event_description(calendar_event_id, appended_text):
     service = get_google_calendar_service()
     if service is None:
+        _audit_calendar_update(calendar_event_id=calendar_event_id, success=False, appended_text=appended_text)
         return False
 
     try:
         calendar_event = CalendarEvent.objects.get(id=calendar_event_id)
     except CalendarEvent.DoesNotExist:
         logger.error("CalendarEvent %s does not exist; Google Calendar update skipped.", calendar_event_id)
+        _audit_calendar_update(calendar_event_id=calendar_event_id, success=False, appended_text=appended_text)
         return False
 
     if not calendar_event.google_calendar_id or not calendar_event.google_event_id:
@@ -205,6 +214,7 @@ def update_google_event_description(calendar_event_id, appended_text):
             "CalendarEvent %s is missing google_calendar_id or google_event_id; Google Calendar update skipped.",
             calendar_event.id,
         )
+        _audit_calendar_update(calendar_event_id=calendar_event.id, success=False, appended_text=appended_text)
         return False
 
     try:
@@ -231,6 +241,7 @@ def update_google_event_description(calendar_event_id, appended_text):
             exc,
             exc_info=True,
         )
+        _audit_calendar_update(calendar_event_id=calendar_event.id, success=False, appended_text=appended_text)
         return False
     except Exception as exc:
         logger.error(
@@ -239,6 +250,7 @@ def update_google_event_description(calendar_event_id, appended_text):
             exc,
             exc_info=True,
         )
+        _audit_calendar_update(calendar_event_id=calendar_event.id, success=False, appended_text=appended_text)
         return False
 
     calendar_event.last_synced_at = timezone.now()
@@ -249,7 +261,40 @@ def update_google_event_description(calendar_event_id, appended_text):
         calendar_event.google_calendar_id,
         calendar_event.id,
     )
+    _audit_calendar_update(
+        calendar_event_id=calendar_event.id,
+        success=True,
+        appended_text=appended_text,
+        technician_id=calendar_event.technician_id,
+        google_event_id=calendar_event.google_event_id,
+    )
     return True
+
+
+def _audit_calendar_sync(*, technician_id, summary):
+    log_audit_event(
+        "calendar.sync",
+        target=f"technician:{technician_id}",
+        metadata={
+            "created": summary.get("created", 0),
+            "updated": summary.get("updated", 0),
+            "skipped": summary.get("skipped", 0),
+            "has_error": bool(summary.get("error")),
+        },
+    )
+
+
+def _audit_calendar_update(*, calendar_event_id, success, appended_text, technician_id=None, google_event_id=""):
+    log_audit_event(
+        "calendar.update_description",
+        target=f"calendar_event:{calendar_event_id}",
+        metadata={
+            "success": success,
+            "technician_id": technician_id,
+            "google_event_id": google_event_id,
+            "appended_text_length": len(appended_text or ""),
+        },
+    )
 
 
 def _build_sync_window(start_date=None, end_date=None):

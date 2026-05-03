@@ -2,6 +2,7 @@ from urllib.parse import urlencode, urljoin
 
 from aiogram import F, Router
 from aiogram.filters import CommandStart
+from aiogram.filters.command import Command, CommandObject
 from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
@@ -12,6 +13,7 @@ from aiogram.types import (
     WebAppInfo,
 )
 
+from telegram_bots.technician_bot.client import claim_registration, complete_registration
 from telegram_bots.technician_bot.config import get_settings
 
 
@@ -23,6 +25,7 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
         keyboard=[
             [KeyboardButton(text="Submit Report"), KeyboardButton(text="Submit Expense")],
             [KeyboardButton(text="Receipt / Contract"), KeyboardButton(text="My ID")],
+            [KeyboardButton(text="Complete Registration")],
         ],
         resize_keyboard=True,
         input_field_placeholder="Choose an action",
@@ -57,7 +60,29 @@ def _form_url(form_name: str, user_id: int, chat_id: int) -> str:
 
 
 @router.message(CommandStart())
-async def start(message: Message) -> None:
+async def start(message: Message, command: CommandObject | None = None) -> None:
+    token = (command.args or "").strip() if command else ""
+    if token and message.chat.type == "private":
+        try:
+            claim_registration(
+                {
+                    "token": token,
+                    "telegram_user_id": message.from_user.id,
+                    "telegram_username": message.from_user.username or "",
+                }
+            )
+        except Exception:
+            await message.answer(
+                "I couldn't link your registration token. Ask your manager to generate a fresh Telegram registration link.",
+                reply_markup=main_menu_keyboard(),
+            )
+            return
+        await message.answer(
+            "Registration token linked. Now open your work group chat and press Complete Registration there.",
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+
     await message.answer(
         "HVAC technician tools are ready. Choose a form below.",
         reply_markup=form_links_keyboard(message.from_user.id, message.chat.id),
@@ -145,4 +170,32 @@ async def receipt_contract_link(message: Message) -> None:
                 ]
             ]
         ),
+    )
+
+
+@router.message(F.text == "Complete Registration")
+@router.message(Command("register"))
+async def complete_registration_handler(message: Message) -> None:
+    if message.chat.type not in {"group", "supergroup"}:
+        await message.answer("Please use Complete Registration inside your work group chat.")
+        return
+
+    try:
+        complete_registration(
+            {
+                "telegram_user_id": message.from_user.id,
+                "telegram_username": message.from_user.username or "",
+                "telegram_group_chat_id": message.chat.id,
+                "telegram_group_title": message.chat.title or "",
+                "telegram_chat_type": message.chat.type,
+            }
+        )
+    except Exception:
+        await message.answer(
+            "I couldn't complete registration yet. First open your manager's registration link in a private chat with me, then try again here."
+        )
+        return
+
+    await message.answer(
+        "Registration complete. This work chat is now linked to your technician profile."
     )

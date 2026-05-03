@@ -46,7 +46,7 @@ class WorkReportViewSet(viewsets.ModelViewSet):
         return queryset
 
     def create(self, request, *args, **kwargs):
-        work_report = ReportSubmissionService().submit_report(request.data)
+        work_report = ReportSubmissionService().submit_report(request.data, actor=request.user)
         serializer = self.get_serializer(work_report)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

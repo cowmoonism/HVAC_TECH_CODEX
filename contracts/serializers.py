@@ -1,11 +1,15 @@
 from rest_framework import serializers
 
 from contracts.models import ServiceContract
+from technicians.validators import MAX_TEXT_LENGTH, validate_non_negative_amount
 
 
 class ServiceContractSerializer(serializers.ModelSerializer):
     technician_display_name = serializers.SerializerMethodField()
     calendar_event_title = serializers.SerializerMethodField()
+    project_description = serializers.CharField(required=False, allow_blank=True, max_length=MAX_TEXT_LENGTH)
+    subtotal = serializers.DecimalField(max_digits=10, decimal_places=2)
+    sales_tax = serializers.DecimalField(max_digits=10, decimal_places=2)
 
     class Meta:
         model = ServiceContract
@@ -58,3 +62,9 @@ class ServiceContractSerializer(serializers.ModelSerializer):
         if not obj.calendar_event_id:
             return None
         return obj.calendar_event.title
+
+    def validate_subtotal(self, value):
+        return validate_non_negative_amount(value, "subtotal")
+
+    def validate_sales_tax(self, value):
+        return validate_non_negative_amount(value, "sales_tax")

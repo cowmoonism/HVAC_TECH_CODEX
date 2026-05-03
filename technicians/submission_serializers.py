@@ -6,12 +6,24 @@ from contracts.models import CleaningProjectType
 from expenses.models import ExpenseType
 from reports.models import ClosedBy, PaymentType, ReviewStatus
 from technicians.models import Technician
+from technicians.validators import (
+    MAX_TEXT_LENGTH,
+    validate_http_url,
+    validate_non_negative_amount,
+    validate_telegram_numeric,
+)
 
 
 class TechnicianSubmissionBaseSerializer(serializers.Serializer):
     telegram_user_id = serializers.CharField(max_length=64)
     telegram_group_chat_id = serializers.CharField(max_length=64, required=False, allow_blank=True)
     google_event_id = serializers.CharField(max_length=255, required=False, allow_blank=True)
+
+    def validate_telegram_user_id(self, value):
+        return validate_telegram_numeric(value, "telegram_user_id")
+
+    def validate_telegram_group_chat_id(self, value):
+        return validate_telegram_numeric(value, "telegram_group_chat_id")
 
     def get_technician(self):
         telegram_user_id = self.validated_data["telegram_user_id"]
@@ -76,8 +88,8 @@ class TechnicianWorkReportSubmissionSerializer(TechnicianSubmissionBaseSerialize
     payment_type = serializers.ChoiceField(choices=PaymentType.choices)
     amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     closed_by = serializers.ChoiceField(choices=ClosedBy.choices)
-    project_description = serializers.CharField(required=False, allow_blank=True)
-    comments = serializers.CharField(required=False, allow_blank=True)
+    project_description = serializers.CharField(required=False, allow_blank=True, max_length=MAX_TEXT_LENGTH)
+    comments = serializers.CharField(required=False, allow_blank=True, max_length=MAX_TEXT_LENGTH)
     groupon_review = serializers.ChoiceField(choices=ReviewStatus.choices)
     google_review = serializers.ChoiceField(choices=ReviewStatus.choices)
     yearly_maintenance_plan = serializers.ChoiceField(choices=ReviewStatus.choices)
@@ -114,8 +126,14 @@ class TechnicianExpenseSubmissionSerializer(TechnicianSubmissionBaseSerializer):
     expense_date = serializers.DateField()
     expense_type = serializers.ChoiceField(choices=ExpenseType.choices)
     amount = serializers.DecimalField(max_digits=10, decimal_places=2)
-    description = serializers.CharField(required=False, allow_blank=True)
+    description = serializers.CharField(required=False, allow_blank=True, max_length=MAX_TEXT_LENGTH)
     receipt_photo_url = serializers.URLField(required=False, allow_blank=True)
+
+    def validate_amount(self, value):
+        return validate_non_negative_amount(value)
+
+    def validate_receipt_photo_url(self, value):
+        return validate_http_url(value, "receipt_photo_url")
 
     def to_service_data(self):
         technician = self.get_technician()
@@ -140,7 +158,7 @@ class TechnicianContractSubmissionSerializer(TechnicianSubmissionBaseSerializer)
     customer_phone = serializers.CharField(max_length=32)
     state_id = serializers.CharField(max_length=64, required=False, allow_blank=True)
     project_type = serializers.ChoiceField(choices=CleaningProjectType.choices)
-    project_description = serializers.CharField(required=False, allow_blank=True)
+    project_description = serializers.CharField(required=False, allow_blank=True, max_length=MAX_TEXT_LENGTH)
     subtotal = serializers.DecimalField(max_digits=10, decimal_places=2)
     sales_tax = serializers.DecimalField(max_digits=10, decimal_places=2)
     credit_card_last4 = serializers.CharField(max_length=4, required=False, allow_blank=True)
@@ -168,3 +186,11 @@ class TechnicianContractSubmissionSerializer(TechnicianSubmissionBaseSerializer)
         }
         data.update(self.telegram_metadata())
         return data
+    def validate_amount(self, value):
+        return validate_non_negative_amount(value)
+
+    def validate_subtotal(self, value):
+        return validate_non_negative_amount(value, "subtotal")
+
+    def validate_sales_tax(self, value):
+        return validate_non_negative_amount(value, "sales_tax")

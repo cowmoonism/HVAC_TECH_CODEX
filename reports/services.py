@@ -2,6 +2,7 @@ import logging
 
 from django.utils import timezone
 
+from audit.services import log_audit_event
 from calendar_sync.services import update_google_event_description
 from notifications.services import NotificationService, get_technician_group_chat
 from reports.models import WorkReport
@@ -44,10 +45,21 @@ def update_calendar_event_with_report(work_report_id):
 
 
 class ReportSubmissionService:
-    def submit_report(self, data: dict):
+    def submit_report(self, data: dict, *, actor=None):
         serializer = WorkReportSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         work_report = serializer.save()
+        log_audit_event(
+            "report.create",
+            actor=actor,
+            target=f"work_report:{work_report.id}",
+            metadata={
+                "technician_id": work_report.technician_id,
+                "calendar_event_id": work_report.calendar_event_id,
+                "payment_type": work_report.payment_type,
+                "amount": work_report.amount,
+            },
+        )
 
         try:
             send_report_to_telegram(work_report.id)

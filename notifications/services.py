@@ -59,12 +59,23 @@ class NotificationService:
             response = requests.post(url, json=payload, timeout=10)
             response.raise_for_status()
         except requests.RequestException as exc:
-            logger.error("Telegram %s request failed: %s", method, exc, exc_info=True)
+            logger.error(
+                "Telegram %s request failed for chat %s with %s.",
+                method,
+                payload.get("chat_id"),
+                exc.__class__.__name__,
+                exc_info=True,
+            )
             return False
 
         data = response.json()
         if not data.get("ok"):
-            logger.error("Telegram %s request returned not-ok response: %s", method, data)
+            logger.error(
+                "Telegram %s request returned not-ok response for chat %s with description=%s.",
+                method,
+                payload.get("chat_id"),
+                data.get("description", ""),
+            )
             return False
 
         logger.info("Telegram %s request succeeded for chat %s.", method, payload.get("chat_id"))

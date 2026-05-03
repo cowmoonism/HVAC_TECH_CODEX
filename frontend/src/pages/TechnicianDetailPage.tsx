@@ -5,10 +5,12 @@ import {
   getTechnicianDetail,
   parseApiError,
   sendTechnicianSchedule,
+  startTelegramRegistration,
   syncTechnicianCalendar,
   type CalendarSyncResult,
   type ScheduleDeliveryResult,
   type TechnicianDetail,
+  type TelegramRegistration,
 } from "../api/client";
 import { canManageTechnicians, canUseScheduleSync } from "../auth/storage";
 import { AsyncState } from "../components/AsyncState";
@@ -29,6 +31,9 @@ export function TechnicianDetailPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<CalendarSyncResult | null>(null);
   const [syncError, setSyncError] = useState("");
+  const [startingRegistration, setStartingRegistration] = useState(false);
+  const [registrationError, setRegistrationError] = useState("");
+  const [registrationResult, setRegistrationResult] = useState<TelegramRegistration | null>(null);
   const [scheduleDate, setScheduleDate] = useState(tomorrowIso());
   const [sendingSchedule, setSendingSchedule] = useState(false);
   const [scheduleResult, setScheduleResult] = useState<ScheduleDeliveryResult | null>(null);
@@ -105,6 +110,23 @@ export function TechnicianDetailPage() {
     }
   }
 
+  async function handleStartTelegramRegistration() {
+    if (!id) {
+      return;
+    }
+    setStartingRegistration(true);
+    setRegistrationError("");
+    try {
+      const result = await startTelegramRegistration(id);
+      setRegistrationResult(result);
+      loadDetail(id);
+    } catch (err) {
+      setRegistrationError(parseApiError(err));
+    } finally {
+      setStartingRegistration(false);
+    }
+  }
+
   return (
     <section className="page-stack">
       <AsyncState loading={loading} error={error}>
@@ -148,6 +170,50 @@ export function TechnicianDetailPage() {
                 </span>
               </div>
             </section>
+
+            {canManageTechnicians() && (
+              <section className="panel">
+                <div className="page-heading-row">
+                  <h2>Telegram Registration</h2>
+                  <button type="button" onClick={handleStartTelegramRegistration} disabled={startingRegistration}>
+                    {startingRegistration ? "Preparing..." : "Start Telegram Registration"}
+                  </button>
+                </div>
+                <p className="subtle">
+                  Ask the technician to open the private bot link first, then press Complete Registration inside the work group chat.
+                </p>
+                <div className="checklist">
+                  <span className={detail.telegram_registration.telegram_user_id ? "check-pass" : "check-missing"}>
+                    Telegram user claimed
+                  </span>
+                  <span className={detail.telegram_registration.telegram_group_chat_id ? "check-pass" : "check-missing"}>
+                    Work group linked
+                  </span>
+                </div>
+                {(registrationResult || detail.telegram_registration.token) && (
+                  <div className="panel compact-panel muted-panel">
+                    <p><strong>Status:</strong> {(registrationResult ?? detail.telegram_registration).status}</p>
+                    {(registrationResult ?? detail.telegram_registration).bot_start_url ? (
+                      <p className="subtle">
+                        Bot link: <a href={(registrationResult ?? detail.telegram_registration).bot_start_url} target="_blank" rel="noreferrer">{(registrationResult ?? detail.telegram_registration).bot_start_url}</a>
+                      </p>
+                    ) : (
+                      <p className="subtle">Set `TECHNICIAN_BOT_USERNAME` in backend settings to generate a direct bot start link.</p>
+                    )}
+                    {(registrationResult ?? detail.telegram_registration).token && (
+                      <p className="subtle">Registration token: {(registrationResult ?? detail.telegram_registration).token}</p>
+                    )}
+                    {detail.telegram_registration.telegram_username && (
+                      <p className="subtle">Claimed by: @{detail.telegram_registration.telegram_username}</p>
+                    )}
+                    {detail.telegram_registration.telegram_group_title && (
+                      <p className="subtle">Linked group: {detail.telegram_registration.telegram_group_title}</p>
+                    )}
+                  </div>
+                )}
+                {registrationError && <div className="panel error-panel compact-panel">{registrationError}</div>}
+              </section>
+            )}
 
             {(syncResult || syncError) && (
               <section className={`panel ${syncResult?.error || syncError ? "error-panel" : "muted-panel"}`}>

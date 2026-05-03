@@ -100,6 +100,12 @@ Run Django checks:
 python manage.py check
 ```
 
+Run deployment checks with production-like settings:
+
+```powershell
+python manage.py check --deploy
+```
+
 Run automated tests:
 
 ```powershell
@@ -176,6 +182,56 @@ Authorization: Bearer <access>
 
 `GET /api/auth/me/` returns the same user object. The React dashboard stores the access token, refresh token, and role in `localStorage` for now.
 
+## Technician Telegram Registration
+
+Technician onboarding supports a Telegram-first registration flow so managers do not have to collect Telegram IDs manually.
+
+Recommended flow:
+
+1. Create the technician in the dashboard with status `ONBOARDING`
+2. Open the technician detail page and click `Start Telegram Registration`
+3. The dashboard returns a registration token and, when `TECHNICIAN_BOT_USERNAME` is configured, a direct bot deep link
+4. The technician opens that link in a private chat with the technician bot, which claims the registration token against their `telegram_user_id`
+5. The manager creates the work Telegram group and adds:
+   - the technician
+   - the technician bot
+   - the backend notification bot
+6. The technician runs `/register` or taps `Complete Registration` inside the work group
+7. Backend stores:
+   - `telegram_user_id`
+   - `telegram_username`
+   - `telegram_group_chat_id`
+   - `telegram_group_title`
+
+After Telegram registration and `google_calendar_id` are present, the technician can be activated.
+
+Environment for this flow:
+
+- `TECHNICIAN_BOT_TOKEN`
+- `TECHNICIAN_BOT_USERNAME`
+- `TECHNICIAN_API_SHARED_SECRET`
+
+Manager-facing endpoints:
+
+```text
+POST /api/technicians/<id>/start-telegram-registration/
+GET /api/technicians/<id>/telegram-registration/
+```
+
+Internal bot endpoints:
+
+```text
+POST /api/technician-bot/claim-registration/
+POST /api/technician-bot/complete-registration/
+```
+
+Schedule title conventions:
+
+- `cancel`, `canceled`, `cancelled` in title are treated as current cancellation markers
+- `reschedule`, `rescheduled` in title are treated as current reschedule markers
+- `fake` in title is treated as a fake/test marker
+- `didn't buy`, `didnt buy`, `refuse`, and `refused` are context-only notes and should not hide work from technician schedule delivery
+
 ## Frontend Setup
 
 The first dashboard UI lives in `frontend/` and uses Vite, React, and TypeScript.
@@ -218,6 +274,27 @@ It currently checks:
 - `npm run build`
 
 A pull request template is also included at [.github/pull_request_template.md](/C:/HVAC_TECH_CODEX/.github/pull_request_template.md) to keep validation and rollout notes consistent.
+
+## Security Checklist
+
+- Set a strong `DJANGO_SECRET_KEY`
+- Set `DEBUG=False`
+- Set `ALLOWED_HOSTS`
+- Set `CSRF_TRUSTED_ORIGINS`
+- Set `CORS_ALLOWED_ORIGINS`
+- Set `DATABASE_URL`
+- Set `SECURE_SSL_REDIRECT=True`
+- Set `SESSION_COOKIE_SECURE=True`
+- Set `CSRF_COOKIE_SECURE=True`
+- Set `SECURE_HSTS_SECONDS` to a production value such as `31536000`
+- Set `SECURE_HSTS_INCLUDE_SUBDOMAINS=True` only if every subdomain is HTTPS-only
+- Set `SECURE_HSTS_PRELOAD=True` only if you intend to meet browser preload requirements
+- Set `PUBLIC_BASE_URL` to the deployed backend URL
+- Set `TELEGRAM_BOT_TOKEN`
+- Set `TECHNICIAN_BOT_TOKEN`
+- Store Google service account credentials as a secret file and set `GOOGLE_SERVICE_ACCOUNT_JSON_PATH`
+- Provision persistent storage for generated PDFs
+- Run `python manage.py check --deploy` before production cutover
 
 Frontend routes:
 

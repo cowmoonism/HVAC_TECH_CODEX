@@ -1,11 +1,14 @@
 from rest_framework import serializers
 
 from expenses.models import ExpenseReport
+from technicians.validators import MAX_TEXT_LENGTH, validate_http_url, validate_non_negative_amount
 
 
 class ExpenseReportSerializer(serializers.ModelSerializer):
     technician_display_name = serializers.SerializerMethodField()
     calendar_event_title = serializers.SerializerMethodField()
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    description = serializers.CharField(required=False, allow_blank=True, max_length=MAX_TEXT_LENGTH)
 
     class Meta:
         model = ExpenseReport
@@ -43,3 +46,9 @@ class ExpenseReportSerializer(serializers.ModelSerializer):
         if not obj.calendar_event_id:
             return None
         return obj.calendar_event.title
+
+    def validate_amount(self, value):
+        return validate_non_negative_amount(value)
+
+    def validate_receipt_photo_url(self, value):
+        return validate_http_url(value, "receipt_photo_url")
