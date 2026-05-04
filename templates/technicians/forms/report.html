@@ -3,6 +3,7 @@
 <form>
   <input type="hidden" name="telegram_user_id" value="{{ telegram_user_id }}">
   <input type="hidden" name="telegram_group_chat_id" value="{{ telegram_group_chat_id }}">
+  <input id="google_event_id" name="google_event_id" type="hidden">
   <section id="calendar-event-picker" class="event-picker">
     <h2>Choose Job</h2>
     <p>Select the calendar job first. The form will prefill the event, date, job number, and address.</p>
@@ -14,10 +15,6 @@
     <div>
       <label for="report_date">Report Date</label>
       <input id="report_date" name="report_date" type="date" required>
-    </div>
-    <div>
-      <label for="google_event_id">Google Event ID</label>
-      <input id="google_event_id" name="google_event_id" type="text" readonly>
     </div>
     <div>
       <label for="job_number">Job Number</label>

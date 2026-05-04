@@ -251,6 +251,7 @@ class TechnicianSubmissionAuthTests(TestCase):
         events = data["events"]
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0]["google_event_id"], "google-active-1")
+        self.assertEqual(events[0]["day_sequence"], 1)
         self.assertEqual(events[0]["location"], "100 Test Ave")
         self.assertEqual(events[0]["report_count"], 1)
 

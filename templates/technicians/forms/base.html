@@ -239,7 +239,7 @@
 
     function applyCalendarEvent(eventData) {
       setFieldValue("google_event_id", eventData.google_event_id);
-      setFieldValue("job_number", eventData.job_number || "");
+      setFieldValue("job_number", eventData.job_number || eventData.day_sequence || "");
       setFieldValue("address", eventData.location || "");
       setFieldValue("customer_address", eventData.location || "");
       setFieldValue("report_date", localDateValue(eventData.start_at));
@@ -275,7 +275,8 @@
           button.type = "button";
           button.className = "event-option";
           const title = document.createElement("strong");
-          title.textContent = `${index + 1}. ${eventData.title || "Untitled job"}`;
+          const sequence = eventData.day_sequence || index + 1;
+          title.textContent = `${sequence}. ${eventData.title || "Untitled job"}`;
           const time = document.createElement("span");
           time.textContent = eventData.time_label || "";
           const location = document.createElement("span");

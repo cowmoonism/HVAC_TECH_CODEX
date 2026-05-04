@@ -146,12 +146,13 @@ class TechnicianCalendarEventsView(TechnicianSubmissionAuthMixin, APIView):
         )
 
         payload = []
-        for event in events:
+        for index, event in enumerate(events, start=1):
             local_start = timezone.localtime(event.start_at)
             local_end = timezone.localtime(event.end_at)
             payload.append(
                 {
                     "id": event.id,
+                    "day_sequence": index,
                     "google_event_id": event.google_event_id,
                     "title": event.clean_title_for_technician(),
                     "raw_title": event.title,
