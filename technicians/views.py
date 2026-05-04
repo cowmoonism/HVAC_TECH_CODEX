@@ -112,6 +112,21 @@ class TechnicianViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        duplicate = (
+            Technician.objects.filter(google_calendar_id=technician.google_calendar_id)
+            .exclude(pk=technician.pk)
+            .first()
+        )
+        if duplicate:
+            return Response(
+                {
+                    "detail": "Technician cannot be activated because this Google Calendar ID is already assigned to another technician.",
+                    "google_calendar_id": "A technician with this Google Calendar ID already exists.",
+                    "conflicting_technician_id": duplicate.id,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         technician.status = TechnicianStatus.ACTIVE
         technician.save(update_fields=["status", "updated_at"])
         log_audit_event(

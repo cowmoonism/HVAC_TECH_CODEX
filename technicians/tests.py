@@ -62,6 +62,60 @@ class TechnicianActivationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(technician.status, TechnicianStatus.ACTIVE)
 
+    def test_create_rejects_duplicate_google_calendar_id(self):
+        Technician.objects.create(
+            first_name="Existing",
+            last_name="Tech",
+            display_name="Existing Tech",
+            status=TechnicianStatus.ONBOARDING,
+            google_calendar_id="shared-calendar@example.com",
+        )
+
+        response = self.client.post(
+            "/api/technicians/",
+            {
+                "first_name": "New",
+                "last_name": "Tech",
+                "display_name": "New Tech",
+                "status": TechnicianStatus.ONBOARDING,
+                "google_calendar_id": "shared-calendar@example.com",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["google_calendar_id"],
+            ["A technician with this Google Calendar ID already exists."],
+        )
+
+    def test_activate_rejects_duplicate_google_calendar_id_in_existing_data(self):
+        existing = Technician.objects.create(
+            first_name="Existing",
+            last_name="Tech",
+            display_name="Existing Tech",
+            status=TechnicianStatus.ACTIVE,
+            telegram_user_id="tg-user-existing",
+            telegram_group_chat_id="-100999",
+            google_calendar_id="shared-calendar@example.com",
+        )
+        technician = Technician.objects.create(
+            first_name="Duplicate",
+            last_name="Tech",
+            display_name="Duplicate Tech",
+            status=TechnicianStatus.ONBOARDING,
+            telegram_user_id="tg-user-duplicate",
+            telegram_group_chat_id="-100888",
+            google_calendar_id="shared-calendar@example.com",
+        )
+
+        response = self.client.post(f"/api/technicians/{technician.id}/activate/", {}, format="json")
+
+        technician.refresh_from_db()
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(technician.status, TechnicianStatus.ONBOARDING)
+        self.assertEqual(response.json()["conflicting_technician_id"], existing.id)
+
 
 class TechnicianSubmissionAuthTests(TestCase):
     def setUp(self):

@@ -74,6 +74,13 @@ class TechnicianSerializer(serializers.ModelSerializer):
             if queryset.exists():
                 errors["telegram_group_chat_id"] = "A technician with this Telegram group chat ID already exists."
 
+        if google_calendar_id:
+            queryset = Technician.objects.filter(google_calendar_id=google_calendar_id)
+            if instance:
+                queryset = queryset.exclude(pk=instance.pk)
+            if queryset.exists():
+                errors["google_calendar_id"] = "A technician with this Google Calendar ID already exists."
+
         if status == TechnicianStatus.ACTIVE and not google_calendar_id:
             errors["google_calendar_id"] = "Google Calendar ID is required before a technician can be active."
 
