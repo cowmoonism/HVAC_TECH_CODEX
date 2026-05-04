@@ -53,22 +53,31 @@ def send_contract_pdf_to_telegram(service_contract_id):
     if not service_contract.pdf_file_url:
         logger.warning("Service contract %s has no PDF URL; Telegram PDF send skipped.", service_contract.id)
         return False
-    public_pdf_url = build_public_url(service_contract.pdf_file_url)
-    if public_pdf_url.startswith("/"):
-        logger.warning(
-            "Service contract %s PDF URL %s is relative and PUBLIC_BASE_URL is missing. Telegram requires a public URL; send skipped.",
-            service_contract.id,
-            public_pdf_url,
-        )
-        return False
 
     chat_id = get_technician_group_chat(service_contract.technician)
     caption = f"Service contract {service_contract.contract_number}"
-    sent = NotificationService().send_document_to_telegram(
-        chat_id=chat_id,
-        file_url=public_pdf_url,
-        caption=caption,
-    )
+    local_pdf_path = Path(settings.MEDIA_ROOT) / "contracts" / f"{service_contract.contract_number}.pdf"
+    notification_service = NotificationService()
+    if local_pdf_path.exists():
+        sent = notification_service.send_document_file_to_telegram(
+            chat_id=chat_id,
+            file_path=local_pdf_path,
+            caption=caption,
+        )
+    else:
+        public_pdf_url = build_public_url(service_contract.pdf_file_url)
+        if public_pdf_url.startswith("/"):
+            logger.warning(
+                "Service contract %s PDF URL %s is relative, local file is missing, and PUBLIC_BASE_URL is missing; send skipped.",
+                service_contract.id,
+                public_pdf_url,
+            )
+            return False
+        sent = notification_service.send_document_to_telegram(
+            chat_id=chat_id,
+            file_url=public_pdf_url,
+            caption=caption,
+        )
     if sent:
         service_contract.telegram_sent_at = timezone.now()
         service_contract.status = ContractStatus.SENT
