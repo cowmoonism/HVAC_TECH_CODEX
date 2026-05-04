@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.shortcuts import render
 
-from contracts.models import CleaningProjectType
+from contracts.models import CleaningProjectType, PaymentProcessingType
 from expenses.models import ExpenseType
 from reports.models import ClosedBy, PaymentType, ReviewStatus
 
@@ -48,4 +48,5 @@ def expense_form(request):
 def contract_form(request):
     context = _base_context(request, "Receipt / Contract", "/api/technician/submit-contract/")
     context["project_types"] = CleaningProjectType.choices
+    context["payment_processing_types"] = PaymentProcessingType.choices
     return render(request, "technicians/forms/contract.html", context)

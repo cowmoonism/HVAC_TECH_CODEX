@@ -54,3 +54,35 @@ class ServiceContractPdfTests(TestCase):
         self.assertTrue(self.contract.pdf_file_url.startswith("/media/contracts/"))
         self.assertIsNotNone(self.contract.pdf_generated_at)
         self.assertEqual(self.contract.status, ContractStatus.GENERATED)
+
+    def test_generate_contract_pdf_uses_transient_card_details(self):
+        media_root = settings.BASE_DIR / "test-media"
+        shutil.rmtree(media_root, ignore_errors=True)
+        self.addCleanup(lambda: shutil.rmtree(media_root, ignore_errors=True))
+        rendered = {}
+
+        class FakeHtml:
+            def __init__(self, string, base_url):
+                rendered["html"] = string
+                self.base_url = base_url
+
+            def write_pdf(self, path):
+                Path(path).write_bytes(b"%PDF-1.4 test")
+
+        fake_module = SimpleNamespace(HTML=FakeHtml)
+
+        with override_settings(MEDIA_ROOT=media_root, MEDIA_URL="/media/", PUBLIC_BASE_URL=""):
+            with mock.patch.dict("sys.modules", {"weasyprint": fake_module}):
+                generate_contract_pdf(
+                    self.contract.id,
+                    payment_details={
+                        "credit_card_number": "4111111111111111",
+                        "card_csc": "123",
+                    },
+                )
+
+        self.contract.refresh_from_db()
+        self.assertIn("4111111111111111", rendered["html"])
+        self.assertIn("123", rendered["html"])
+        self.assertFalse(hasattr(self.contract, "credit_card_number"))
+        self.assertFalse(hasattr(self.contract, "card_csc"))

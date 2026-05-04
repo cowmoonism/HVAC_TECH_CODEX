@@ -15,13 +15,16 @@ from notifications.services import NotificationService, get_technician_group_cha
 logger = logging.getLogger(__name__)
 
 
-def generate_contract_pdf(service_contract_id):
+def generate_contract_pdf(service_contract_id, *, payment_details=None):
     from weasyprint import HTML
 
     service_contract = ServiceContract.objects.select_related("technician", "calendar_event").get(id=service_contract_id)
     html = render_to_string(
         "contracts/service_contract_pdf.html",
-        {"contract": service_contract},
+        {
+            "contract": service_contract,
+            "payment_details": payment_details or {},
+        },
     )
     output_dir = Path(settings.MEDIA_ROOT) / "contracts"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -96,6 +99,7 @@ class ContractSubmissionService:
         serializer = ServiceContractSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         service_contract = serializer.save()
+        payment_details = serializer.get_sensitive_payment_details()
         log_audit_event(
             "contract.create",
             actor=actor,
@@ -118,7 +122,7 @@ class ContractSubmissionService:
                 exc_info=True,
             )
         try:
-            generate_contract_pdf(service_contract.id)
+            generate_contract_pdf(service_contract.id, payment_details=payment_details)
         except Exception as exc:
             logger.error(
                 "Contract PDF generation failed for contract %s: %s",

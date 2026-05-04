@@ -25,6 +25,12 @@ class CleaningProjectType(models.TextChoices):
     OTHER = "OTHER", "Other"
 
 
+class PaymentProcessingType(models.TextChoices):
+    SWIPED = "SWIPED", "Swiped"
+    MANUALLY_ENTERED = "MANUALLY_ENTERED", "Manually Entered"
+    OVER_THE_PHONE = "OVER_THE_PHONE", "Over-the-phone"
+
+
 class ServiceContract(models.Model):
     technician = models.ForeignKey(
         Technician,
@@ -54,6 +60,11 @@ class ServiceContract(models.Model):
     subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     sales_tax = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    payment_processing_type = models.CharField(
+        max_length=32,
+        choices=PaymentProcessingType.choices,
+        blank=True,
+    )
     credit_card_last4 = models.CharField(max_length=4, blank=True)
     card_exp_date = models.CharField(max_length=10, blank=True)
     billing_zip_code = models.CharField(max_length=16, blank=True)

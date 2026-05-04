@@ -10,6 +10,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import UserRole
 from calendar_sync.models import CalendarEvent, CalendarEventStatus, CalendarEventType
+from contracts.models import ServiceContract
 from reports.models import WorkReport
 from technicians.form_tokens import create_technician_form_token
 from technicians.models import (
@@ -254,6 +255,48 @@ class TechnicianSubmissionAuthTests(TestCase):
         self.assertEqual(events[0]["day_sequence"], 1)
         self.assertEqual(events[0]["location"], "100 Test Ave")
         self.assertEqual(events[0]["report_count"], 1)
+
+    @override_settings(DEBUG=False, TECHNICIAN_API_SHARED_SECRET="shared-secret")
+    def test_contract_submission_accepts_full_card_but_redacts_raw_submission(self):
+        token = create_technician_form_token(
+            {
+                "telegram_user_id": self.technician.telegram_user_id,
+                "telegram_group_chat_id": self.technician.telegram_group_chat_id,
+            },
+            "shared-secret",
+        )
+
+        response = self.client.post(
+            "/api/technician/submit-contract/",
+            {
+                "contract_date": "2026-05-02",
+                "customer_name": "Card Customer",
+                "customer_address": "500 Contract Ave",
+                "customer_phone": "555-2000",
+                "project_type": "AIR_DUCT_CLEANING",
+                "project_description": "Contract with full card fields.",
+                "subtotal": "250.00",
+                "sales_tax": "20.63",
+                "payment_processing_type": "MANUALLY_ENTERED",
+                "credit_card_number": "4111 1111 1111 1111",
+                "card_exp_date": "12/27",
+                "card_csc": "123",
+                "billing_zip_code": "90001",
+            },
+            format="json",
+            HTTP_X_TECHNICIAN_FORM_TOKEN=token,
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertNotIn("credit_card_number", payload)
+        self.assertNotIn("card_csc", payload)
+        contract = ServiceContract.objects.latest("id")
+        self.assertEqual(contract.credit_card_last4, "1111")
+        self.assertFalse(hasattr(contract, "credit_card_number"))
+        self.assertFalse(hasattr(contract, "card_csc"))
+        self.assertEqual(contract.raw_submission["credit_card_number"], "[REDACTED]")
+        self.assertEqual(contract.raw_submission["card_csc"], "[REDACTED]")
 
     def _build_init_data(self, *, bot_token, user_id, auth_date):
         payload = {

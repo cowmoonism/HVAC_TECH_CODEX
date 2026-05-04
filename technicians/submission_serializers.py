@@ -2,7 +2,8 @@ from rest_framework import serializers
 from rest_framework.exceptions import NotFound
 
 from calendar_sync.models import CalendarEvent, CalendarEventStatus, CalendarEventType
-from contracts.models import CleaningProjectType
+from contracts.models import CleaningProjectType, PaymentProcessingType
+from contracts.serializers import normalize_card_number, validate_card_csc
 from expenses.models import ExpenseType
 from reports.models import ClosedBy, PaymentType, ReviewStatus
 from technicians.models import Technician
@@ -152,6 +153,8 @@ class TechnicianExpenseSubmissionSerializer(TechnicianSubmissionBaseSerializer):
 
 
 class TechnicianContractSubmissionSerializer(TechnicianSubmissionBaseSerializer):
+    sensitive_submission_fields = {"credit_card_number", "card_csc"}
+
     contract_date = serializers.DateField()
     customer_name = serializers.CharField(max_length=255)
     customer_address = serializers.CharField()
@@ -161,9 +164,23 @@ class TechnicianContractSubmissionSerializer(TechnicianSubmissionBaseSerializer)
     project_description = serializers.CharField(required=False, allow_blank=True, max_length=MAX_TEXT_LENGTH)
     subtotal = serializers.DecimalField(max_digits=10, decimal_places=2)
     sales_tax = serializers.DecimalField(max_digits=10, decimal_places=2)
+    payment_processing_type = serializers.ChoiceField(
+        choices=PaymentProcessingType.choices,
+        required=False,
+        allow_blank=True,
+    )
+    credit_card_number = serializers.CharField(max_length=19, required=False, allow_blank=True)
     credit_card_last4 = serializers.CharField(max_length=4, required=False, allow_blank=True)
     card_exp_date = serializers.CharField(max_length=10, required=False, allow_blank=True)
+    card_csc = serializers.CharField(max_length=4, required=False, allow_blank=True)
     billing_zip_code = serializers.CharField(max_length=16, required=False, allow_blank=True)
+
+    def _sanitized_raw_submission(self):
+        raw = dict(self.initial_data)
+        for field in self.sensitive_submission_fields:
+            if field in raw and raw[field]:
+                raw[field] = "[REDACTED]"
+        return raw
 
     def to_service_data(self):
         technician = self.get_technician()
@@ -180,17 +197,26 @@ class TechnicianContractSubmissionSerializer(TechnicianSubmissionBaseSerializer)
             "project_description": self.validated_data.get("project_description", ""),
             "subtotal": self.validated_data["subtotal"],
             "sales_tax": self.validated_data["sales_tax"],
+            "payment_processing_type": self.validated_data.get("payment_processing_type", ""),
+            "credit_card_number": self.validated_data.get("credit_card_number", ""),
             "credit_card_last4": self.validated_data.get("credit_card_last4", ""),
             "card_exp_date": self.validated_data.get("card_exp_date", ""),
+            "card_csc": self.validated_data.get("card_csc", ""),
             "billing_zip_code": self.validated_data.get("billing_zip_code", ""),
         }
-        data.update(self.telegram_metadata())
+        metadata = self.telegram_metadata()
+        metadata["raw_submission"] = self._sanitized_raw_submission()
+        data.update(metadata)
         return data
-    def validate_amount(self, value):
-        return validate_non_negative_amount(value)
 
     def validate_subtotal(self, value):
         return validate_non_negative_amount(value, "subtotal")
 
     def validate_sales_tax(self, value):
         return validate_non_negative_amount(value, "sales_tax")
+
+    def validate_credit_card_number(self, value):
+        return normalize_card_number(value)
+
+    def validate_card_csc(self, value):
+        return validate_card_csc(value)

@@ -300,6 +300,8 @@ A pull request template is also included at [.github/pull_request_template.md](/
 - Set `TECHNICIAN_BOT_TOKEN`
 - Store Google service account credentials as a secret file and set `GOOGLE_SERVICE_ACCOUNT_JSON_PATH`
 - Provision persistent storage for generated PDFs
+- Do not store full card numbers or CSC/CVV values in the database, logs, raw submissions, or API responses
+- Treat generated contract PDFs that contain card details as sensitive documents with restricted access and retention
 - Run `python manage.py check --deploy` before production cutover
 
 Frontend routes:
@@ -695,6 +697,9 @@ Current implemented behavior:
 - Build a readable Telegram-style contract summary from saved contract data.
 - Attempt Telegram summary delivery through `NotificationService` without blocking API creation.
 - Generate a PDF receipt/contract from an HTML template.
+- Accept full card number and CSC only as write-only, transient submission fields for PDF generation.
+- Persist only `credit_card_last4`, expiration date, billing ZIP, and payment processing type.
+- Redact full card number and CSC from `raw_submission`, API responses, and Telegram text summaries.
 - Store generated PDFs under `media/contracts/`.
 - Set `pdf_file_url`, `pdf_generated_at`, and move the contract to `GENERATED` unless it is already `SENT` or `SIGNED`.
 - Build absolute PDF URLs from `PUBLIC_BASE_URL` when configured.
@@ -702,7 +707,7 @@ Current implemented behavior:
 
 Future behavior:
 
-- Use production-grade public media storage.
+- Use private production-grade media storage with signed URLs or short retention for PDFs containing payment details.
 - Send the generated PDF back to the technician's Telegram group chat using a public URL or direct file upload.
 
 ## Roles

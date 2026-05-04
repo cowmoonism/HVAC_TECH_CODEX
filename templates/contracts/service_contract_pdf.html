@@ -95,12 +95,16 @@
       font-size: 11px;
       color: #475467;
     }
+    .warning {
+      color: #b42318;
+      font-size: 10px;
+    }
   </style>
 </head>
 <body>
   <div class="header">
     <p class="company">HVAC Operations Platform</p>
-    <p class="muted">Service receipt and contract placeholder header</p>
+    <p class="muted">Cleaning Services Inc - service receipt and contract</p>
     <div class="meta">
       <div>
         <p><strong>Contract Number:</strong> {{ contract.contract_number }}</p>
@@ -130,17 +134,20 @@
   <div class="section">
     <h2>Totals</h2>
     <table class="amounts">
-      <tr><td>Subtotal</td><td>${{ contract.subtotal }}</td></tr>
-      <tr><td>Sales Tax</td><td>${{ contract.sales_tax }}</td></tr>
-      <tr class="total"><td>Total</td><td>${{ contract.total }}</td></tr>
+      <tr><td>Sub-total</td><td>${{ contract.subtotal }}</td></tr>
+      <tr><td>State/Local Sales Tax</td><td>${{ contract.sales_tax }}</td></tr>
+      <tr class="total"><td>Final Project Cost</td><td>${{ contract.total }}</td></tr>
     </table>
   </div>
 
   <div class="section">
     <h2>Payment</h2>
-    <div class="row"><div class="label">Credit Card Last 4</div><div class="value">{{ contract.credit_card_last4|default:"N/A" }}</div></div>
-    <div class="row"><div class="label">Card Expiration</div><div class="value">{{ contract.card_exp_date|default:"N/A" }}</div></div>
-    <div class="row"><div class="label">Billing ZIP</div><div class="value">{{ contract.billing_zip_code|default:"N/A" }}</div></div>
+    <div class="row"><div class="label">Payment Processing Type</div><div class="value">{{ contract.get_payment_processing_type_display|default:"N/A" }}</div></div>
+    <div class="row"><div class="label">Credit/Debit Card #</div><div class="value">{{ payment_details.credit_card_number|default:"N/A" }}</div></div>
+    <div class="row"><div class="label">Exp. Date</div><div class="value">{{ contract.card_exp_date|default:"N/A" }}</div></div>
+    <div class="row"><div class="label">CSC</div><div class="value">{{ payment_details.card_csc|default:"N/A" }}</div></div>
+    <div class="row"><div class="label">Billing ZIP Code</div><div class="value">{{ contract.billing_zip_code|default:"N/A" }}</div></div>
+    <p class="warning">Card fields are completed only when the customer pays by card.</p>
   </div>
 
   <div class="signature">
@@ -156,7 +163,7 @@
 
   <div class="section terms">
     <h2>Terms</h2>
-    <p>Simple terms placeholder: customer authorizes the listed work and agrees to the stated total. Final production terms, warranty language, cancellation policy, and signature language will be finalized before launch.</p>
+    <p>Customer authorizes Cleaning Services Inc to perform the listed work and agrees to the final project cost shown above. Payment is due on the same day as service. All payments are final and subject to no change or refunds except as required by law or written agreement. Customer acknowledges that access, safety conditions, furniture movement, and any additional work may affect final scope and timing. Full production legal terms should be reviewed before launch.</p>
   </div>
 </body>
 </html>
