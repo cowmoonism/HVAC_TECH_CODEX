@@ -113,15 +113,6 @@ class ContractSubmissionService:
             },
         )
         try:
-            send_contract_summary_to_telegram(service_contract.id)
-        except Exception as exc:
-            logger.error(
-                "Contract Telegram summary notification failed for contract %s: %s",
-                service_contract.id,
-                exc,
-                exc_info=True,
-            )
-        try:
             generate_contract_pdf(service_contract.id, payment_details=payment_details)
         except Exception as exc:
             logger.error(
