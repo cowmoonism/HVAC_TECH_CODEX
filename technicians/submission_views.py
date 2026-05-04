@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from calendar_sync.models import CalendarEvent, CalendarEventStatus, CalendarEventType
+from calendar_sync.services import sync_google_calendar_for_technician
 from contracts.serializers import ServiceContractSerializer
 from contracts.services import ContractSubmissionService
 from expenses.serializers import ExpenseReportSerializer
@@ -120,15 +121,26 @@ class TechnicianCalendarEventsView(TechnicianSubmissionAuthMixin, APIView):
                 {"detail": "date must use YYYY-MM-DD format."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        sync_summary = None
+        if technician.google_calendar_id:
+            sync_summary = sync_google_calendar_for_technician(
+                technician_id=technician.id,
+                start_date=parsed_date,
+                end_date=parsed_date,
+            )
+
         start_at = timezone.make_aware(datetime.combine(parsed_date, datetime.min.time()))
         end_at = timezone.make_aware(datetime.combine(parsed_date, datetime.max.time()))
 
+        day_events = CalendarEvent.objects.filter(
+            technician=technician,
+            start_at__gte=start_at,
+            start_at__lte=end_at,
+        )
         events = (
-            CalendarEvent.objects.filter(
-                technician=technician,
+            day_events.filter(
                 event_type=CalendarEventType.JOB,
-                start_at__gte=start_at,
-                start_at__lte=end_at,
             )
             .exclude(
                 status__in=[
@@ -168,14 +180,31 @@ class TechnicianCalendarEventsView(TechnicianSubmissionAuthMixin, APIView):
                     "report_count": report_counts.get(event.id, 0),
                 }
             )
+        diagnostics = {}
+        if not payload:
+            diagnostics = {
+                "google_calendar_id_configured": bool(technician.google_calendar_id),
+                "calendar_events_for_date": day_events.count(),
+                "job_events_for_date": day_events.filter(event_type=CalendarEventType.JOB).count(),
+                "inactive_job_events_for_date": day_events.filter(
+                    event_type=CalendarEventType.JOB,
+                    status__in=[
+                        CalendarEventStatus.CANCELED,
+                        CalendarEventStatus.RESCHEDULED,
+                        CalendarEventStatus.FAKE,
+                    ],
+                ).count(),
+            }
         return Response(
             {
                 "technician_id": technician.id,
                 "target_date": parsed_date.isoformat(),
                 "range_start": start_at.isoformat(),
                 "range_end": end_at.isoformat(),
+                "sync": sync_summary,
                 "events_count": len(payload),
                 "events": payload,
+                "diagnostics": diagnostics,
             }
         )
 
