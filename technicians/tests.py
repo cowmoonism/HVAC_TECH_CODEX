@@ -182,7 +182,8 @@ class TechnicianSubmissionAuthTests(TestCase):
         self.assertEqual(work_report.technician_id, self.technician.id)
 
     @override_settings(DEBUG=False, TECHNICIAN_API_SHARED_SECRET="shared-secret")
-    def test_signed_form_token_can_list_active_calendar_events(self):
+    def test_signed_form_token_can_list_todays_active_calendar_events(self):
+        today_start = timezone.localtime().replace(hour=10, minute=0, second=0, microsecond=0)
         active_event = CalendarEvent.objects.create(
             technician=self.technician,
             google_calendar_id="calendar@example.com",
@@ -191,8 +192,8 @@ class TechnicianSubmissionAuthTests(TestCase):
             status=CalendarEventStatus.SCHEDULED,
             title="1. Active Duct Cleaning",
             location="100 Test Ave",
-            start_at=timezone.now() + timedelta(days=1),
-            end_at=timezone.now() + timedelta(days=1, hours=2),
+            start_at=today_start,
+            end_at=today_start + timedelta(hours=2),
             job_number="1",
         )
         CalendarEvent.objects.create(
@@ -203,9 +204,21 @@ class TechnicianSubmissionAuthTests(TestCase):
             status=CalendarEventStatus.CANCELED,
             title="2. Cancel hidden",
             location="200 Test Ave",
-            start_at=timezone.now() + timedelta(days=1),
-            end_at=timezone.now() + timedelta(days=1, hours=2),
+            start_at=today_start + timedelta(hours=3),
+            end_at=today_start + timedelta(hours=5),
             job_number="2",
+        )
+        CalendarEvent.objects.create(
+            technician=self.technician,
+            google_calendar_id="calendar@example.com",
+            google_event_id="google-tomorrow-1",
+            event_type=CalendarEventType.JOB,
+            status=CalendarEventStatus.SCHEDULED,
+            title="3. Tomorrow hidden",
+            location="300 Test Ave",
+            start_at=today_start + timedelta(days=1),
+            end_at=today_start + timedelta(days=1, hours=2),
+            job_number="3",
         )
         WorkReport.objects.create(
             technician=self.technician,
@@ -232,7 +245,10 @@ class TechnicianSubmissionAuthTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        events = response.json()["events"]
+        data = response.json()
+        self.assertEqual(data["target_date"], timezone.localdate().isoformat())
+        self.assertEqual(data["events_count"], 1)
+        events = data["events"]
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0]["google_event_id"], "google-active-1")
         self.assertEqual(events[0]["location"], "100 Test Ave")

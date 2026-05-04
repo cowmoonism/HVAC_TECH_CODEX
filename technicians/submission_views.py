@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from django.conf import settings
 from django.db.models import Count
@@ -112,30 +112,16 @@ class TechnicianCalendarEventsView(TechnicianSubmissionAuthMixin, APIView):
         if auth_response is not None:
             return auth_response
 
-        now = timezone.localtime()
-        start_date = request.query_params.get("start_date")
-        end_date = request.query_params.get("end_date")
+        target_date = request.query_params.get("date") or timezone.localdate().isoformat()
         try:
-            days_ahead = int(request.query_params.get("days_ahead") or 14)
-        except ValueError:
-            return Response({"detail": "days_ahead must be a number."}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            if start_date:
-                start_at = timezone.make_aware(datetime.fromisoformat(start_date))
-            else:
-                start_at = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            if end_date:
-                end_at = timezone.make_aware(datetime.fromisoformat(end_date)).replace(
-                    hour=23, minute=59, second=59, microsecond=999999
-                )
-            else:
-                end_at = start_at + timedelta(days=days_ahead)
+            parsed_date = datetime.fromisoformat(target_date).date()
         except ValueError:
             return Response(
-                {"detail": "start_date and end_date must use YYYY-MM-DD format."},
+                {"detail": "date must use YYYY-MM-DD format."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        start_at = timezone.make_aware(datetime.combine(parsed_date, datetime.min.time()))
+        end_at = timezone.make_aware(datetime.combine(parsed_date, datetime.max.time()))
 
         events = (
             CalendarEvent.objects.filter(
@@ -181,7 +167,16 @@ class TechnicianCalendarEventsView(TechnicianSubmissionAuthMixin, APIView):
                     "report_count": report_counts.get(event.id, 0),
                 }
             )
-        return Response({"technician_id": technician.id, "events": payload})
+        return Response(
+            {
+                "technician_id": technician.id,
+                "target_date": parsed_date.isoformat(),
+                "range_start": start_at.isoformat(),
+                "range_end": end_at.isoformat(),
+                "events_count": len(payload),
+                "events": payload,
+            }
+        )
 
 
 class SubmitWorkReportView(TechnicianSubmissionAuthMixin, APIView):

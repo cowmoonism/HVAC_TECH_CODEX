@@ -254,7 +254,7 @@
       try {
         const initData = telegramWebApp ? telegramWebApp.initData : "";
         const submissionToken = new URLSearchParams(window.location.search).get("submission_token") || "";
-        const response = await fetch("/api/technician/calendar-events/?days_ahead=14", {
+        const response = await fetch("/api/technician/calendar-events/", {
           headers: {
             "X-Telegram-WebApp-InitData": initData,
             "X-Technician-Form-Token": submissionToken
@@ -265,7 +265,7 @@
         if (!data.events || !data.events.length) {
           list.textContent = "";
           const empty = document.createElement("p");
-          empty.textContent = "No upcoming active jobs found.";
+          empty.textContent = "No active jobs found for today.";
           list.appendChild(empty);
           return;
         }
