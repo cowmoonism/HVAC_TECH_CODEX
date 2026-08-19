@@ -27,4 +27,4 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "python docker/wait_for_db.py && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"]
+CMD ["sh", "-c", "python docker/wait_for_db.py && python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000}"]
