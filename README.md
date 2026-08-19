@@ -378,7 +378,7 @@ In `DEBUG=True`, Django serves local media at:
 /media/
 ```
 
-Production deployments should use persistent/public media storage. Telegram document delivery needs either a public file URL or a later direct file-upload integration; local `/media/` URLs are only suitable for development.
+Production deployments should use persistent media storage. When the generated PDF is available under `MEDIA_ROOT`, Telegram delivery uploads the local file directly. If the local file is unavailable, delivery falls back to a public URL built from `PUBLIC_BASE_URL`.
 
 For local PDF URL testing, set:
 
@@ -498,6 +498,8 @@ The technician detail page shows an onboarding checklist and an Activate button 
 
 ## Production Checklist
 
+For the complete staging resource layout, environment-variable wiring, secret-file setup, deployment order, and media limitations, see [RENDER_STAGING.md](C:/HVAC_TECH_CODEX/RENDER_STAGING.md).
+
 - Set a strong `DJANGO_SECRET_KEY`
 - Set `DEBUG=False`
 - Set `ALLOWED_HOSTS`
@@ -518,13 +520,8 @@ Current implemented behavior:
 - Validate and save a `WorkReport`.
 - Normalize amount to zero for `ESTIMATE` and `CANCEL`.
 - Build a readable Telegram-style report message from saved report data.
-- Attempt Telegram delivery through `NotificationService` without blocking API creation.
-- Call the placeholder Google Calendar description update hook without blocking API creation.
-
-Future behavior:
-
-- Send the formatted report to the technician's Telegram group chat.
-- Append report details to the matching Google Calendar event description.
+- Attempt to send the formatted report to the technician's Telegram group chat without blocking API creation.
+- Replace the managed work-report block in the matching Google Calendar event description without blocking API creation.
 - Calculate daily and weekly summaries from saved reports.
 
 ## Technician Submission API
@@ -694,8 +691,7 @@ Current implemented behavior:
 - Validate and save a `ServiceContract`.
 - Calculate `total` from `subtotal + sales_tax`.
 - Generate a readable unique contract number.
-- Build a readable Telegram-style contract summary from saved contract data.
-- Attempt Telegram summary delivery through `NotificationService` without blocking API creation.
+- Build a readable Telegram-style contract summary from saved contract data when needed by callers.
 - Generate a PDF receipt/contract from an HTML template.
 - Accept full card number and CSC only as write-only, transient submission fields for PDF generation.
 - Persist only `credit_card_last4`, expiration date, billing ZIP, and payment processing type.
@@ -703,12 +699,12 @@ Current implemented behavior:
 - Store generated PDFs under `media/contracts/`.
 - Set `pdf_file_url`, `pdf_generated_at`, and move the contract to `GENERATED` unless it is already `SENT` or `SIGNED`.
 - Build absolute PDF URLs from `PUBLIC_BASE_URL` when configured.
-- Attempt Telegram PDF delivery without blocking API creation. Relative `/media/` URLs are logged and skipped because Telegram needs a public URL.
+- Attempt Telegram PDF delivery without blocking API creation. Delivery uploads a local generated PDF directly when available and otherwise falls back to a public URL.
+- Send the PDF without a separate Telegram text summary.
 
 Future behavior:
 
 - Use private production-grade media storage with signed URLs or short retention for PDFs containing payment details.
-- Send the generated PDF back to the technician's Telegram group chat using a public URL or direct file upload.
 
 ## Roles
 
